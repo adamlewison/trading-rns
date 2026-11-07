@@ -1,0 +1,11 @@
+# data & secrets
+data/
+!data/.gitkeep
+.env
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+# notebooks
+__marimo__/

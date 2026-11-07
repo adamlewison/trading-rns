@@ -1,0 +1,79 @@
+# Central configuration. Secrets live in .env (see .env.example), never here.
+
+paths:
+  data_dir: data
+  db: data/rns.duckdb
+  raw_dir: data/raw            # cached downloads (HTML, xlsx, zip) — never re-downloaded
+  log_dir: data/logs
+
+dates:
+  start: 2012-01-01
+  end: null                    # null = today
+
+universe:
+  # LSE public reports (docs.londonstockexchange.com/reports/...)
+  instrument_list_url: https://docs.londonstockexchange.com/reports/instruments/Instrument%20list.xlsx
+  issuer_latest_index: https://docs.londonstockexchange.com/reports/issuers/latest.json
+  issuer_historic_index: https://docs.londonstockexchange.com/reports/issuers/historic.json
+  issuer_archive_min_year: 2011   # monthly snapshots used for point-in-time market & market cap
+  include_aim: true
+  include_smallcap_proxy: true    # Main Market commercial equities outside the FTSE 350 (see ASSUMPTIONS.md)
+  # LSE "Market Sector Code" values that mark FTSE 100 / FTSE 250 members in the instrument list
+  ftse100_sector_codes: [FE10, FS10]
+  ftse250_sector_codes: [F25T, F25F, F25S]
+
+prices:
+  yahoo_suffix: .L
+  batch_size: 40
+  pause_between_batches_s: 3.0
+  max_retries: 3
+  refresh_after_days: 3           # skip tickers downloaded more recently than this (resumable)
+  index_tickers:
+    aim_all_share: ^FTAI
+    ftse_smallcap: ^FTSC
+    ftse_all_share: ^FTAS
+  # a day-to-day move this large (either direction) that reverses next day is treated as a
+  # Yahoo GBP/GBp unit glitch and flagged, not silently fixed
+  unit_glitch_ratio: 30
+
+scrape:
+  source: investegate
+  user_agent: "trading-rns-research/0.1 (personal non-commercial research; python-httpx)"
+  min_interval_s: 2.0             # >= 2s between requests to the same host
+  timeout_s: 30
+  max_retries: 5
+  backoff_base_s: 4.0
+  respect_robots: true
+  index_mode: company             # company | daily  (see README)
+  # only fetch full body text for announcements that are (a) non-admin and (b) for universe tickers
+  bodies_only_for_universe: true
+  bodies_only_pre_open: false     # true = only fetch bodies for announcements published before 08:00 UK
+
+# ---------- later phases (placeholders, used from Phase 2 on) ----------
+llm:
+  provider: anthropic             # anthropic | openai_compatible (e.g. Vercel AI Gateway)
+  model: claude-haiku-5-5
+  base_url: null                  # for openai_compatible
+  confirm_cost_above_gbp: 5.0
+  pilot_size: 500
+  context_prev_announcements: 3
+
+costs:
+  slippage_pct: 0.25              # each side, % of price
+  stamp_duty_non_aim_pct: 0.5     # buys only
+  stamp_duty_aim_pct: 0.0
+  commission_gbp: 0.0             # Trading 212
+  spread_multiplier: 1.0          # robustness: 1.5, 2.0
+
+labels:
+  targets_pct: [3, 5, 8]
+  stop_pct: 3
+  max_hold_days: 3
+  same_bar_both_hit: stop         # conservative
+
+liquidity:
+  position_gbp: 1500
+  max_pct_of_adv: 1.0
+
+backtest:
+  holdout_months: 12
