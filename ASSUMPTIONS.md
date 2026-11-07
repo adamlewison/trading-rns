@@ -63,8 +63,9 @@ results look better than they really are is flagged with ⚠️.
 - **Source choice and terms.** robots.txt allows the pages we use (`/company/`, `/today-announcements/`,
   `/announcement/`). The Terms of Use allow personal reference by private investors only, with no
   redistribution or commercial use. So this pipeline is for personal research. The scraped text
-  stays in the local `data/` folder (gitignored) and must never be published. Rate limit is 1
-  request per second (robots.txt sets no crawl delay; raised from 2s on 2026-11-07), with an honest User-Agent, and all HTML is cached so nothing is fetched twice.
+  stays in the local `data/` folder (gitignored) and must never be published. Rate limit is 2
+  requests per second (robots.txt sets no crawl delay; raised from 1 per 2s, then 1/s, on 2026-11-07).
+  On 403/429/5xx the scraper backs off and stops after 3 consecutive blocks; it never evades a block, with an honest User-Agent, and all HTML is cached so nothing is fetched twice.
 - **Timestamps** come from the listing pages and are UK wall-clock time (e.g. "07:00 AM"). They
   are stored as `published_uk` and converted to UTC with DST handled. `pre_open` = weekday and
   before 08:00 UK. Bank holidays are not handled here; Phase 3 maps every announcement to the next
