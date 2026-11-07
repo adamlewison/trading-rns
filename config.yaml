@@ -77,3 +77,10 @@ liquidity:
 
 backtest:
   holdout_months: 12
+
+backup:
+  store: b2                       # b2 | local
+  bucket: null                    # null = the single bucket the B2 key is restricted to
+  prefix: trading-rns/v1
+  local_dir: null                 # for store: local
+  interval_min: 60

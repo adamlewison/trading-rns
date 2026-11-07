@@ -65,6 +65,15 @@ uv run python -m ingest.announcements.run report
 nohup ingest/run_full.sh > data/logs/full_run.out 2>&1 &
 ```
 
+**Backups** (the container is ephemeral): `core/backup.py` pushes incremental snapshots of the
+DuckDB tables and the raw-HTML cache to a private Backblaze B2 bucket. `ingest/resume.sh` restores
+from that backup on a fresh machine and restarts the scrape and the hourly backup loop.
+
+```bash
+uv run python -m core.backup push | pull | status
+ingest/resume.sh
+```
+
 **Index modes:**
 - `company`: walks each universe ticker's announcement list, newest first, until it passes
   `dates.start`. Uses few requests (about 4–5 per ticker), but only covers tickers we already know,
