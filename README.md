@@ -59,6 +59,12 @@ uv run python -m ingest.announcements.run build
 uv run python -m ingest.announcements.run report
 ```
 
+**Full run** (all of the above, in order, resumable):
+
+```bash
+nohup ingest/run_full.sh > data/logs/full_run.out 2>&1 &
+```
+
 **Index modes:**
 - `company`: walks each universe ticker's announcement list, newest first, until it passes
   `dates.start`. Uses few requests (about 4–5 per ticker), but only covers tickers we already know,

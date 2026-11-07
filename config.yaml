@@ -47,7 +47,7 @@ scrape:
   index_mode: company             # company | daily  (see README)
   # only fetch full body text for announcements that are (a) non-admin and (b) for universe tickers
   bodies_only_for_universe: true
-  bodies_only_pre_open: false     # true = only fetch bodies for announcements published before 08:00 UK
+  bodies_only_pre_open: true      # hypothesis is about pre-open news (user decision 2026-11-07)
 
 # ---------- later phases (placeholders, used from Phase 2 on) ----------
 llm:
