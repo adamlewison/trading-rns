@@ -39,7 +39,7 @@ prices:
 scrape:
   source: investegate
   user_agent: "trading-rns-research/0.1 (personal non-commercial research; python-httpx)"
-  min_interval_s: 2.0             # >= 2s between requests to the same host
+  min_interval_s: 1.0             # >= 1s between requests to the same host (robots.txt sets no crawl-delay)
   timeout_s: 30
   max_retries: 5
   backoff_base_s: 4.0
