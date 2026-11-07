@@ -11,8 +11,8 @@ What is backed up (under <prefix>/):
   manifest.json                 watermarks + hashes
 
 Storage is private and only for personal research: the scraped text is never published.
-Credentials: Backblaze B2 key, stored as an environment network secret and injected by the
-proxy into requests to api.backblazeb2.com. The key itself never sits in this repo or container.
+Credentials: on your own machine, B2_KEY_ID / B2_APP_KEY in .env (gitignored). In the cloud
+session, the key is an environment network secret injected by the proxy, never in the container.
 """
 from __future__ import annotations
 
@@ -79,8 +79,11 @@ class B2Store:
 
     def __init__(self, bucket_name: str | None = None):
         self.http = httpx.Client(timeout=300)
-        placeholder = base64.b64encode(b"proxy:injected").decode()
-        r = self.http.get(self.AUTH_URL, headers={"Authorization": f"Basic {placeholder}"})
+        # On your own machine: B2_KEY_ID / B2_APP_KEY from .env. In the cloud session the proxy
+        # injects the real credential, so a placeholder of the right shape is sent instead.
+        kid, key = os.environ.get("B2_KEY_ID"), os.environ.get("B2_APP_KEY")
+        cred = f"{kid}:{key}" if kid and key else "proxy:injected"
+        r = self.http.get(self.AUTH_URL, headers={"Authorization": "Basic " + base64.b64encode(cred.encode()).decode()})
         r.raise_for_status()
         a = r.json()
         api = a["apiInfo"]["storageApi"]

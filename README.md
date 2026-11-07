@@ -74,6 +74,17 @@ uv run python -m core.backup push | pull | status
 ingest/resume.sh
 ```
 
+**Running the long scrape on your own machine / VPS** (cloud sessions suspend when idle):
+
+```bash
+git clone <repo> && cd trading-rns && uv sync
+cp .env.example .env            # fill in B2_KEY_ID / B2_APP_KEY
+uv run python -m core.backup pull          # restore everything scraped so far
+nohup ingest/run_full.sh >> data/logs/full_run.out 2>&1 &   # resumes where it stopped
+nohup ingest/backup_loop.sh >> data/logs/backup_loop.out 2>&1 &
+tail -f data/logs/announcements.log
+```
+
 **Index modes:**
 - `company`: walks each universe ticker's announcement list, newest first, until it passes
   `dates.start`. Uses few requests (about 4–5 per ticker), but only covers tickers we already know,
