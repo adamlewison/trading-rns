@@ -83,4 +83,4 @@ backup:
   bucket: trading-rns-backup-c0772b   # private; lifecycle keeps only the latest version
   prefix: trading-rns/v1
   local_dir: null                 # for store: local
-  interval_min: 60
+  interval_min: 30
