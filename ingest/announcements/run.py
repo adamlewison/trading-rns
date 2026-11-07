@@ -22,12 +22,33 @@ import pandas as pd
 
 from core.config import date_range, load_config
 from core.db import connect, session
+from core.http import Blocked
 from core.log import get_logger
 from ingest.announcements.base import iter_company, iter_day
 from ingest.announcements.investegate import Investegate
 from ingest.announcements.store import insert_index
 
 log = get_logger("announcements")
+
+MAX_CONSECUTIVE_BLOCKS = 3
+
+
+class Breaker:
+    """Stop the whole job after N consecutive blocked units instead of hammering a site
+    that is refusing us. Exit code 3 = blocked (run_full.sh stops; the check-in reports it)."""
+
+    def __init__(self, n: int = MAX_CONSECUTIVE_BLOCKS):
+        self.n, self.count = n, 0
+
+    def ok(self) -> None:
+        self.count = 0
+
+    def blocked(self, e: Exception) -> None:
+        self.count += 1
+        log.error("blocked (%d/%d in a row): %s", self.count, self.n, e)
+        if self.count >= self.n:
+            log.error("STOPPING: source appears to be blocking/rate-limiting us")
+            raise SystemExit(3)
 
 SOURCES = {"investegate": Investegate}
 
@@ -62,12 +83,17 @@ def index_company(tickers: list[str] | None, limit: int | None, sample: int | No
     if limit:
         todo = todo[:limit]
     log.info("company index: %d tickers to scan (%d already done)", len(todo), n_skipped)
+    breaker = Breaker()
     for i, t in enumerate(todo, 1):
         rows = []
         try:
             for lp in iter_company(src, t, since=start):
                 rows += [r for r in lp.rows if start <= r.published_uk.date() <= end]
             status = "done"
+            breaker.ok()
+        except Blocked as e:
+            breaker.blocked(e)       # nothing recorded -> retried on the next run
+            continue
         except Exception as e:
             log.exception("company %s failed: %s", t, e)
             status = "error"
@@ -83,6 +109,7 @@ def index_daily(start: date, end: date, refresh: bool) -> None:
     src = get_source()
     with session() as con:
         done = set() if refresh else _done(con, src.name)
+    breaker = Breaker()
     d = start
     while d <= end:
         key = f"day:{d.isoformat()}"
@@ -93,6 +120,11 @@ def index_daily(start: date, end: date, refresh: bool) -> None:
                     rows += lp.rows
                 # today's page is still growing -> don't mark done
                 status = "done" if d < date.today() else "partial"
+                breaker.ok()
+            except Blocked as e:
+                breaker.blocked(e)
+                d += timedelta(days=1)
+                continue
             except Exception as e:
                 log.exception("day %s failed: %s", d, e)
                 status = "error"
@@ -123,17 +155,28 @@ def fetch_bodies(limit: int | None, randomise: bool, tickers: list[str] | None =
         todo = con.execute(q).fetchall()
     log.info("bodies: %d to fetch", len(todo))
     buf = []
+    breaker = Breaker()
+
+    def flush():
+        if buf:
+            with session() as con:
+                con.executemany("INSERT OR REPLACE INTO ann_bodies VALUES (?,?,?,?,?)", buf)
+            buf.clear()
+
     for i, (ann_id, url) in enumerate(todo, 1):
         try:
             status, text = src.body(url)
+            breaker.ok()
+        except Blocked as e:
+            flush()
+            breaker.blocked(e)       # not recorded -> retried on the next run
+            continue
         except Exception as e:
             log.warning("body %s failed: %s", ann_id, e)
             status, text = "error", ""
         buf.append([ann_id, text or None, len(text or ""), status, datetime.now()])
         if len(buf) >= 10 or i == len(todo):
-            with session() as con:
-                con.executemany("INSERT OR REPLACE INTO ann_bodies VALUES (?,?,?,?,?)", buf)
-            buf = []
+            flush()
         if i % 25 == 0 or i == len(todo):
             log.info("bodies %d/%d | net=%d cache=%d", i, len(todo), src.client.n_network, src.client.n_cache)
 

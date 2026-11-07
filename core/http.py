@@ -17,11 +17,19 @@ from core.log import get_logger
 
 log = get_logger("http")
 
-RETRY_STATUS = {429, 500, 502, 503, 504}
+RETRY_STATUS = {403, 429, 500, 502, 503, 504}
 
 
 class RobotsDisallowed(Exception):
     pass
+
+
+class Blocked(Exception):
+    """403/429/5xx that survived all retries. Never cached, never treated as 'no data'."""
+
+    def __init__(self, status: int, url: str):
+        super().__init__(f"HTTP {status} for {url}")
+        self.status = status
 
 
 class PoliteClient:
@@ -117,6 +125,10 @@ class PoliteClient:
                 continue
             if r.status_code in (200, 404, 410):
                 self._write_cache(url, r.status_code, r.content)
+                return r.status_code, r.content
+            if r.status_code in (401, 403, 429) or r.status_code >= 500:
+                log.error("BLOCKED? HTTP %s on %s", r.status_code, url)
+                raise Blocked(r.status_code, url)
             return r.status_code, r.content
         raise RuntimeError("unreachable")
 

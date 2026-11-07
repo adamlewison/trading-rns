@@ -92,3 +92,20 @@ def test_iter_company_stops_once_past_start_date():
     src = FakeSource(pages)
     got = list(iter_company(src, "X", since=date(2012, 1, 1)))
     assert len(got) == 2 and src.calls == 2
+
+
+def test_blocked_responses_are_not_cached_or_treated_as_empty(tmp_path, monkeypatch):
+    import httpx
+    import pytest
+
+    from core.http import Blocked, PoliteClient
+
+    c = PoliteClient(min_interval_s=0)
+    c.cache_dir = tmp_path
+    c.respect_robots = False
+    c.max_retries = 1
+    c.backoff = 0
+    c.client = httpx.Client(transport=httpx.MockTransport(lambda req: httpx.Response(429, text="slow down")))
+    with pytest.raises(Blocked):
+        c.get("https://example.test/x")
+    assert not c.cached("https://example.test/x")

@@ -145,8 +145,10 @@ class Investegate:
     def company_page(self, tidm: str, page: int, use_cache: bool = True) -> ListingPage:
         url = f"{BASE}/company/{tidm}" + (f"?page={page}" if page > 1 else "")
         status, html = self._get(url, use_cache)
-        if status != 200:
+        if status in (404, 410):
             return ListingPage()
+        if status != 200:
+            raise RuntimeError(f"unexpected HTTP {status} for {url}")
         if tidm not in self._company_names:
             self._company_names[tidm] = parse_company_name(html)
         return parse_listing(html, tidm=tidm, company=self._company_names[tidm], page=page)
@@ -154,13 +156,17 @@ class Investegate:
     def day_page(self, day: date, page: int, use_cache: bool = True) -> ListingPage:
         url = f"{BASE}/today-announcements/{day.isoformat()}" + (f"?page={page}" if page > 1 else "")
         status, html = self._get(url, use_cache)
-        if status != 200:
+        if status in (404, 410):
             return ListingPage()
+        if status != 200:
+            raise RuntimeError(f"unexpected HTTP {status} for {url}")
         return parse_listing(html, page=page)
 
     def body(self, url: str) -> tuple[str, str]:
         status, html = self._get(url)
         if status in (404, 410):
             return "not_found", ""
+        if status != 200:
+            raise RuntimeError(f"unexpected HTTP {status} for {url}")
         text = extract_body(html)
         return ("ok" if text else "empty"), text
