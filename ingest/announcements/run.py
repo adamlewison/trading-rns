@@ -138,6 +138,22 @@ def fetch_bodies(limit: int | None, randomise: bool, tickers: list[str] | None =
             log.info("bodies %d/%d | net=%d cache=%d", i, len(todo), src.client.n_network, src.client.n_cache)
 
 
+def reclassify() -> None:
+    """Re-apply headline rules (admin filter / category) to everything already indexed."""
+    from ingest.announcements.rules import admin_rule, headline_category, is_replacement
+    with session() as con:
+        df = con.execute("SELECT ann_id, headline FROM ann_index").df()
+        df["admin_rule"] = df["headline"].map(admin_rule)
+        df["is_admin"] = df["admin_rule"].notna()
+        df["headline_category"] = df["headline"].map(headline_category)
+        df["is_replacement"] = df["headline"].map(is_replacement)
+        con.register("rc", df)
+        con.execute("""UPDATE ann_index i SET admin_rule = rc.admin_rule, is_admin = rc.is_admin,
+                       headline_category = rc.headline_category, is_replacement = rc.is_replacement
+                       FROM rc WHERE i.ann_id = rc.ann_id""")
+    log.info("reclassified %d rows: %d admin", len(df), int(df["is_admin"].sum()))
+
+
 def build() -> None:
     """Materialise the two output tables. Errors/missing bodies are retried by re-running `bodies`."""
     with session() as con:
@@ -177,7 +193,7 @@ def report() -> None:
     print("\n== sample of 10 (non-admin, with body) ==")
     s = con.execute("""SELECT tidm, published_uk, pre_open, headline_category, headline, body_chars,
                               left(regexp_replace(body_text, '\\s+', ' ', 'g'), 220) AS body_start
-                       FROM announcements WHERE body_status='ok' USING SAMPLE 10 ROWS (reservoir, 7)""").df()
+                       FROM announcements WHERE body_status='ok' ORDER BY hash(ann_id) LIMIT 10""").df()
     for _, r in s.iterrows():
         print(f"\n[{r.tidm}] {r.published_uk} pre_open={r.pre_open} cat={r.headline_category} chars={r.body_chars}")
         print(f"  {r.headline}")
@@ -186,7 +202,7 @@ def report() -> None:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["index", "bodies", "build", "report"])
+    ap.add_argument("cmd", choices=["index", "bodies", "reclassify", "build", "report"])
     ap.add_argument("--mode", choices=["company", "daily"], default=None)
     ap.add_argument("--tickers", type=lambda s: s.split(","))
     ap.add_argument("--limit", type=int)
@@ -205,6 +221,8 @@ if __name__ == "__main__":
             index_daily(a.start or s, a.end or e, a.refresh)
     elif a.cmd == "bodies":
         fetch_bodies(a.limit, a.random, a.tickers)
+    elif a.cmd == "reclassify":
+        reclassify()
     elif a.cmd == "build":
         build()
     else:

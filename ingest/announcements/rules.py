@@ -16,11 +16,11 @@ _SUFFIX = re.compile(
 ADMIN_PATTERNS: list[tuple[str, str]] = [
     ("total_voting_rights", r"(total voting rights|tvr)( and capital)?( update)?"),
     ("block_listing", r"(six monthly |interim |annual )?block ?listing.*"),
-    ("form_8", r"form 8(\.\d)?.*|form 38\.5.*"),
+    ("form_8", r"(.*:\s*)?form 8(\.\d)?\b.*|.*[_ ]8\.[35][ _]ept.*|(.*:\s*)?form 38\.5.*"),
     ("holdings", r"(notification of )?(major )?holding\(?s?\)? in company|notification of major holdings?|"
-                 r"(tr-?1|tr1)?:? ?(standard form for )?notification of major holdings?"),
+                 r"(tr-?1|tr1)?:? ?(standard form (for )?)?notification of major (holdings?|interests? in shares).?"),
     ("own_shares", r"(transactions? in|purchase of|repurchase of|sale of)( its)? own shares|"
-                   r"(sale|transfer) of (shares )?from treasury|transaction in own shares and total voting rights"),
+                   r"(sale|transfer) of (shares )?from treasury|cancellation of (treasury|own) shares|transaction in own shares and total voting rights"),
     ("meeting_admin", r"(notice of |result(s)? of |posting of |publication of )"
                       r"(the )?(scheme )?(annual |extraordinary |general |court |annual general |)(general )?(meeting|agm|egm|gm)s?"
                       r"( and (.* )?(meeting|agm|egm|gm)s?)?( results)?"),
@@ -36,8 +36,8 @@ ADMIN_PATTERNS: list[tuple[str, str]] = [
                        r"financial adviser|registrar|name)s?.*"),
     ("director_declaration", r"director(s)? declaration.*|(rule|aim rule) 17.*"),
     ("rule_2_9", r"rule 2\.9( announcement)?|rule 2\.10( announcement)?|rule 2\.9 and 2\.10.*"),
-    ("price_monitoring", r"(second |third )?price monitoring extension"),
-    ("options_admin", r"(grant|exercise|vesting|award) of (share )?options.*|exercise of warrants|"
+    ("price_monitoring", r"(second |third )?price monitoring (extension|extn)"),
+    ("options_admin", r"(grant|exercise|vesting|award|issue) of (share )?options.*|exercise of warrants|"
                       r"(employee benefit trust|ebt).*|(issue of equity (re|in respect of|pursuant to) "
                       r"(options|warrants|share options|employee share).*)"),
     ("nav", r"(net asset value|nav)( update)?|weekly nav|monthly nav"),

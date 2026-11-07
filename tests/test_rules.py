@@ -4,17 +4,19 @@ from ingest.announcements.rules import admin_rule, clean_headline, headline_cate
 
 ADMIN = [
     "Total Voting Rights", "TVR", "Replacement - Total Voting Rights", "Holding(s) in Company",
-    "Form 8.3 - Dialight plc", "Form 8 (OPD) - Target plc", "Transaction in Own Shares",
+    "Form 8.3 - Dialight plc", "Man Group PLC : Form 8.3 - Serica Energy plc",
+    "20250326_SERICA ENERGY PLC_8.5 EPT RI_UK_MLI", "Form 8.5 (EPT/NON-RI)-Serica Energy plc", "Form 8 (OPD) - Target plc", "Transaction in Own Shares",
     "Block listing Interim Review", "Result of AGM", "Result of AGM & GM", "Notice of AGM",
     "Results of Scheme Court Meeting & General Meeting", "Notice of Results",
     "Notification of Full Year Results", "Change of Adviser", "Change of Registered Office",
     "Rule 2.9 Announcement", "Posting of Annual Report and Notice of AGM", "Director Declaration",
-    "Price Monitoring Extension", "Notification of Major Holdings",
+    "Price Monitoring Extension", "Second Price Monitoring Extn", "Cancellation of Treasury Shares",
+    "TR-1: NOTIFICATION OF MAJOR INTEREST IN SHARES", "TR-1: Standard form notification of major holdings", "Issue of Options", "Notification of Major Holdings",
 ]
 NOT_ADMIN = [
     "Trading Update", "Final Results", "AGM Statement", "Director/PDMR Shareholding",
     "Director Subscription and Total Voting Rights", "Result of AGM and Trading Update",
-    "Placing to raise £5m", "Contract Win", "Issue of Equity", "Half-year Report",
+    "Placing to raise £5m", "Revenue up 8.3% in H1", "Contract Win", "Issue of Equity", "Half-year Report",
     "Possible Offer for the Company", "Update on Change of Strategy & Notice of GM",
 ]
 

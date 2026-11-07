@@ -49,6 +49,12 @@ results look better than they really are is flagged with ⚠️.
   (Phase 3).
 - `is_suspect` = impossible bar (high < low, price ≤ 0), or a ≥30× jump (Yahoo's GBP vs GBp unit
   glitch). Flagged, never auto-corrected. Suspect rows will be excluded from labels.
+  Since about Feb 2024, Yahoo often returns forward-filled zero-volume days for illiquid names
+  in pounds instead of pence (100× too low; 213 tickers affected, 80% of suspect rows are stale
+  rows). Only the *jump day* is flagged, so Phase 3 has to treat a whole stale stretch after a
+  suspect row as unusable, not just the flagged row.
+- **⚠️ Delisted prices:** only 13 of the first 53 delisted tickers found had any Yahoo history,
+  and some of those 13 may be a different company that reused the TIDM.
 - Prices are in the trading currency (mostly GBX = pence; a few USD/EUR AIM lines). The currency
   is stored in `universe.currency`.
 
@@ -74,6 +80,15 @@ results look better than they really are is flagged with ⚠️.
   director dealing is one of the event types we study.
 - We don't download bodies for admin notices. The headline is enough and it saves requests.
 - The page's "AI summary" block is ignored. The standard RNS footer is cut from the text.
+- **Form 8.x disclosures filed by third parties** (e.g. "Man Group PLC : Form 8.3 - Serica")
+  show up on the *target's* company page but under the *discloser's* name on day pages. The
+  admin filter catches them in both places, including Investegate's odd raw headlines like
+  `20250326_SERICA ENERGY PLC_8.5 EPT RI_UK_MLI`.
+- **Completeness check (pilot):** on 3 busy days (Mar/Apr 2025), Investegate's daily listing
+  contained every announcement that company mode found for the pilot tickers, apart from those
+  third-party Form 8s. Day pages hold about 440–540 announcements per weekday.
+- A ticker's company page includes announcements made under the company's former name
+  (e.g. PHAR shows "Soco International" in 2014). That's the same legal entity, so it's fine.
 - Non-regulatory announcements (RNS Reach and similar, `is_regulatory = false`) are kept and
   flagged. Phase 2/3 can decide whether to drop them.
 - Replacement/amended announcements are kept and flagged (`is_replacement`). Phase 3 should not
