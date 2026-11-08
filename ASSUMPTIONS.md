@@ -94,3 +94,42 @@ results look better than they really are is flagged with ⚠️.
   flagged. Phase 2/3 can decide whether to drop them.
 - Replacement/amended announcements are kept and flagged (`is_replacement`). Phase 3 should not
   treat a replacement as new information.
+
+## US data (SEC EDGAR)
+
+- **Acceptance time:** we use the **filing index page** (`<accession>-index.htm`, "Accepted",
+  Eastern time). The `acceptanceDateTime` in SEC's submissions JSON is labelled UTC ("…Z"), but for
+  many older filings it is actually **Eastern time**: in a 2012–2024 sample, 20–50% per year were
+  off by 4–5 hours. It is stored as `sec_filings.acceptance_utc_sub` for reference only and must
+  never be used for timing.
+- **⚠️ 8-K acceptance ≠ when the market saw the news.** Companies usually put earnings out on a
+  newswire first and file the 8-K minutes to hours later. The acceptance time is therefore an
+  *upper bound* on when the news was public. A strategy timed off acceptance looks later (more
+  conservative) than one timed off the wire. If the 8-K comes well after the release, "pre_market"
+  can understate how early the news was out.
+- **Session labels** use wall-clock ET only. Exchange holidays and half days are not flagged yet.
+- **Documents:** Ex-99.1, else the first EX-99.x, else the primary 8-K document. For news items
+  (1.01/2.01/7.01/8.01) without an exhibit, the 8-K body *is* the news. An 8-K carrying both 2.02
+  and a news item is filed under "earnings" only.
+- **Tickers:** `company_tickers_exchange.json` covers **current** companies only (about 10k rows).
+  Delisted CIKs keep their filings but have no ticker, so no prices.
+- **⚠️ Survivorship:** yfinance has no delisted US prices (see the README for paid options).
+- **Prices:** only NYSE and Nasdaq tickers (OTC skipped), plus SPY and IWM. Same OHLC
+  conventions and flags as the UK prices (split-adjusted; `adj_close` also dividend-adjusted).
+- **Company facts:** a fixed list of XBRL concepts (config `us.fact_concepts`) is extracted, and
+  the whole `companyfacts.zip` is kept so other concepts can be added later. `filed` is the
+  point-in-time date to use. Facts come from 10-K/10-Q filings, so they lag 8-K earnings releases.
+
+## UK trading service (addition A)
+
+- Trading service = (Market Segment Code, Market Sector Code) from the LSE instrument list, mapped
+  through the "Sector Breakdown" sheet of LSE's Business Parameters workbook. Both are official LSE
+  files. **History** only starts from our first download, because LSE publishes the instrument
+  list as "latest" only. Each later monthly `ingest.universe build` adds a snapshot.
+- **⚠️ Today's service applied to the past is an approximation:** stocks move between SETS and
+  SETSqx (LSE reviews liquidity periodically). For backtest filtering, a stock's current service is
+  a proxy for its historical one.
+- LSE's weekly "List of SETS/SETSqx securities" and "Registered Market Makers by Security" files
+  are only linked from a JavaScript page whose API refuses scripted access (HTTP 403), so we don't
+  scrape them. The market-maker file is downloaded by hand and imported with
+  `ingest.uk_trading_service import-mm`.

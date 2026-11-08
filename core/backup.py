@@ -27,7 +27,8 @@ import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Protocol
+from dataclasses import dataclass
+from typing import Callable, Protocol
 from urllib.parse import quote
 
 import httpx
@@ -41,6 +42,41 @@ log = get_logger("backup")
 SNAPSHOT_TABLES = ["lse_instruments", "lse_issuer_snapshots", "universe", "prices_daily",
                    "price_download_log", "ann_index", "scrape_progress"]
 RAW_PART_MAX_BYTES = 400 * 1024 * 1024
+
+
+@dataclass
+class Profile:
+    """What to back up. 'uk' is the original layout (unchanged); 'us' is the SEC EDGAR data."""
+    name: str
+    prefix: str
+    db: Path
+    schema: str
+    raw_dir: Path
+    snapshot_tables: list[str]
+    incr_table: str                 # append-only table backed up incrementally by fetched_at
+    manifest: Path
+    status_name: str
+    status_fn: Callable[[], dict] | None = None
+    raw_exclude: tuple[str, ...] = ()   # top-level subfolders of raw_dir that belong to another profile
+
+
+def get_profile(name: str = "uk") -> Profile:
+    cfg = load_config()
+    prefix = cfg.get("backup", {}).get("prefix", "trading-rns/v1")
+    if name == "uk":
+        return Profile("uk", prefix, cfg["paths"]["db"], SCHEMA, cfg["paths"]["raw_dir"], SNAPSHOT_TABLES,
+                       "ann_bodies", cfg["paths"]["data_dir"] / "backup_manifest.json", "status.json",
+                       lambda: _status(cfg), raw_exclude=("us",))
+    if name == "us":
+        from ingest.us.common import US_SCHEMA, us_cfg
+        u = us_cfg()
+        return Profile("us", prefix.replace("trading-rns/", "trading-rns/us/"), u["db"], US_SCHEMA,
+                       u["raw_dir"] / "sec",
+                       ["sec_form_index", "sec_companies", "sec_filings", "sec_ticker_map", "us_facts",
+                        "us_prices_daily", "us_price_download_log", "us_progress"],
+                       "us_filing_docs", u["db"].parent / "backup_manifest_us.json", "us_status.json",
+                       _us_status)
+    raise ValueError(name)
 
 
 class Store(Protocol):
@@ -150,22 +186,17 @@ def get_store() -> Store:
 
 
 # ------------------------------------------------------------------ push / pull
-def _manifest_path() -> Path:
-    return load_config()["paths"]["data_dir"] / "backup_manifest.json"
-
-
-def _load_manifest(store: Store, prefix: str) -> dict:
-    p = _manifest_path()
+def _load_manifest(store: Store, prefix: str, p: Path) -> dict:
     if p.exists():
         return json.loads(p.read_text())
     remote = store.get(f"{prefix}/manifest.json")
     return json.loads(remote) if remote else {"tables": {}, "bodies_watermark": None, "raw_watermark": 0.0}
 
 
-def _save_manifest(store: Store, prefix: str, m: dict) -> None:
+def _save_manifest(store: Store, prefix: str, m: dict, p: Path) -> None:
     m["updated_at"] = datetime.now().isoformat()
     data = json.dumps(m, indent=1).encode()
-    _manifest_path().write_bytes(data)
+    p.write_bytes(data)
     store.put(f"{prefix}/manifest.json", data)
 
 
@@ -182,37 +213,39 @@ def _content_hash(con, table: str) -> str:
     return f"{h[0]}:{h[1]}"
 
 
-def push(store: Store | None = None) -> dict:
-    cfg = load_config()
-    prefix = cfg.get("backup", {}).get("prefix", "trading-rns/v1")
+def push(store: Store | None = None, profile: str = "uk") -> dict:
+    pf = get_profile(profile)
+    prefix = pf.prefix
     store = store or get_store()
-    m = _load_manifest(store, prefix)
+    m = _load_manifest(store, prefix, pf.manifest)
     stamp = datetime.now().strftime("%Y%m%dT%H%M%S%f")  # unique per push; parts are never overwritten
     uploaded = []
 
-    with session() as con:
+    with session(db=pf.db, schema=pf.schema) as con:
         exports = {}
-        for t in SNAPSHOT_TABLES:
+        for t in pf.snapshot_tables:
             h = _content_hash(con, t)
             if m["tables"].get(t) != h:
                 exports[t] = (h, _export(con, f"SELECT * FROM {t}"))
         wm = m.get("bodies_watermark")
         where = f"WHERE fetched_at > TIMESTAMP '{wm}'" if wm else ""
-        new_wm = con.execute(f"SELECT max(fetched_at) FROM ann_bodies {where}").fetchone()[0]
-        bodies = _export(con, f"SELECT * FROM ann_bodies {where}") if new_wm else None
+        new_wm = con.execute(f"SELECT max(fetched_at) FROM {pf.incr_table} {where}").fetchone()[0]
+        bodies = _export(con, f"SELECT * FROM {pf.incr_table} {where}") if new_wm else None
     # uploads happen outside the DB lock so the scraper isn't blocked
     for t, (h, data) in exports.items():
         store.put(f"{prefix}/db/{t}.parquet", data)
         m["tables"][t] = h
         uploaded.append((t, len(data)))
     if bodies is not None:
-        store.put(f"{prefix}/db/ann_bodies/part-{stamp}.parquet", bodies)
+        store.put(f"{prefix}/db/{pf.incr_table}/part-{stamp}.parquet", bodies)
         m["bodies_watermark"] = str(new_wm)
-        uploaded.append(("ann_bodies", len(bodies)))
+        uploaded.append((pf.incr_table, len(bodies)))
 
-    raw_dir: Path = cfg["paths"]["raw_dir"]
+    raw_dir: Path = pf.raw_dir
     since = m.get("raw_watermark", 0.0)
-    files = sorted((p for p in raw_dir.rglob("*.gz") if p.stat().st_mtime > since), key=lambda p: p.stat().st_mtime)
+    files = sorted((p for p in raw_dir.rglob("*.gz")
+                    if p.stat().st_mtime > since and p.relative_to(raw_dir).parts[0] not in pf.raw_exclude),
+                   key=lambda p: p.stat().st_mtime) if raw_dir.exists() else []
     part, size, n = [], 0, 0
     for i, f in enumerate(files):
         part.append(f)
@@ -225,17 +258,18 @@ def push(store: Store | None = None) -> dict:
             store.put(f"{prefix}/raw/part-{stamp}-{n:03d}.tar", buf.getvalue())
             m["raw_watermark"] = part[-1].stat().st_mtime
             uploaded.append((f"raw part {n} ({len(part)} files)", buf.tell()))
-            _save_manifest(store, prefix, m)   # checkpoint after each raw part
+            _save_manifest(store, prefix, m, pf.manifest)   # checkpoint after each raw part
             part, size, n = [], 0, n + 1
-    _save_manifest(store, prefix, m)
+    _save_manifest(store, prefix, m, pf.manifest)
     try:
-        store.put(f"{prefix}/status/status.json", json.dumps(_status(cfg), indent=1, default=str).encode())
+        if pf.status_fn:
+            store.put(f"{prefix}/status/{pf.status_name}", json.dumps(pf.status_fn(), indent=1, default=str).encode())
     except Exception as e:  # status is best-effort, never fail a backup for it
         log.warning("status upload failed: %s", e)
     for what, nbytes in uploaded:
-        log.info("pushed %s: %.1f MB", what, nbytes / 1e6)
+        log.info("[%s] pushed %s: %.1f MB", pf.name, what, nbytes / 1e6)
     if not uploaded:
-        log.info("nothing new to push")
+        log.info("[%s] nothing new to push", pf.name)
     return m
 
 
@@ -261,49 +295,68 @@ def _status(cfg) -> dict:
             "http_errors": [l for l in tail("http.log", 200) if "WARNING" in l or "ERROR" in l][-10:]}
 
 
-def pull(store: Store | None = None, force: bool = False) -> None:
-    cfg = load_config()
-    prefix = cfg.get("backup", {}).get("prefix", "trading-rns/v1")
-    db_path: Path = cfg["paths"]["db"]
+def _us_status() -> dict:
+    import platform
+    from ingest.us.common import us_cfg
+    u = us_cfg()
+    log_dir: Path = load_config()["paths"]["log_dir"]
+    f = log_dir / "us.log"
+    with session(read_only=True, db=u["db"], schema="") as con:
+        prog = con.execute("SELECT key, status, n FROM us_progress ORDER BY key").df().to_dict("records")
+        docs = con.execute("""SELECT item_group, status, count(*) n FROM us_filing_docs GROUP BY ALL
+                              ORDER BY ALL""").df().to_dict("records")
+    return {"host": platform.node(), "at": datetime.now().isoformat(),
+            "uptime": Path("/proc/uptime").read_text().split()[0] if Path("/proc/uptime").exists() else None,
+            "progress": prog[-8:], "docs": docs,
+            "us_log": f.read_text(errors="replace").splitlines()[-15:] if f.exists() else []}
+
+
+def pull(store: Store | None = None, force: bool = False, profile: str = "uk") -> None:
+    pf = get_profile(profile)
+    prefix = pf.prefix
+    db_path: Path = pf.db
     if db_path.exists() and not force:
         raise SystemExit(f"{db_path} exists; refusing to overwrite (use --force)")
     store = store or get_store()
     if db_path.exists():
         db_path.unlink()
     names = store.list(f"{prefix}/")
-    with tempfile.TemporaryDirectory() as d, session() as con:
-        con.execute(SCHEMA)
-        for t in SNAPSHOT_TABLES:
+    parts = []
+    with tempfile.TemporaryDirectory() as d, session(db=pf.db, schema=pf.schema) as con:
+        for t in pf.snapshot_tables:
             data = store.get(f"{prefix}/db/{t}.parquet")
             if data is None:
                 continue
             f = Path(d) / f"{t}.parquet"
             f.write_bytes(data)
             con.execute(f"INSERT INTO {t} SELECT * FROM '{f}'")
-        parts = sorted(n for n in names if n.startswith(f"{prefix}/db/ann_bodies/"))
+        parts = sorted(n for n in names if n.startswith(f"{prefix}/db/{pf.incr_table}/"))
         for i, name in enumerate(parts):
             f = Path(d) / f"b{i}.parquet"
             f.write_bytes(store.get(name))
         if parts:
-            con.execute(f"""INSERT INTO ann_bodies SELECT * EXCLUDE (rn) FROM (
-                SELECT *, row_number() OVER (PARTITION BY ann_id ORDER BY fetched_at DESC) rn
+            key = "ann_id" if pf.incr_table == "ann_bodies" else "accession"
+            con.execute(f"""INSERT INTO {pf.incr_table} SELECT * EXCLUDE (rn) FROM (
+                SELECT *, row_number() OVER (PARTITION BY {key} ORDER BY fetched_at DESC) rn
                 FROM read_parquet('{d}/b*.parquet')) WHERE rn = 1""")
-    raw_dir: Path = cfg["paths"]["raw_dir"]
+    raw_dir: Path = pf.raw_dir
+    raw_dir.mkdir(parents=True, exist_ok=True)
     for name in sorted(n for n in names if n.startswith(f"{prefix}/raw/")):
         with tarfile.open(fileobj=io.BytesIO(store.get(name))) as tar:
             tar.extractall(raw_dir, filter="data")
     remote = store.get(f"{prefix}/manifest.json")
     if remote:
-        _manifest_path().write_bytes(remote)
-    log.info("restored %d table snapshots, %d body parts, raw parts from %s", len(SNAPSHOT_TABLES),
-             len(parts), prefix)
+        pf.manifest.write_bytes(remote)
+    log.info("[%s] restored %d table snapshots, %d incremental parts, raw parts from %s", pf.name,
+             len(pf.snapshot_tables), len(parts), prefix)
 
 
-def status(store: Store | None = None, remote: bool = False) -> None:
-    prefix = load_config().get("backup", {}).get("prefix", "trading-rns/v1")
+def status(store: Store | None = None, remote: bool = False, profile: str = "uk") -> None:
+    pf = get_profile(profile)
+    prefix = pf.prefix
     store = store or get_store()
     if remote:
-        s = store.get(f"{prefix}/status/status.json")
+        s = store.get(f"{prefix}/status/{pf.status_name}")
         print(json.dumps(json.loads(s), indent=1) if s else "no remote status yet")
         return
     names = store.list(f"{prefix}/")
@@ -317,10 +370,11 @@ if __name__ == "__main__":
     ap.add_argument("cmd", choices=["push", "pull", "status"])
     ap.add_argument("--force", action="store_true")
     ap.add_argument("--remote", action="store_true", help="status: show the status file the VPS uploads")
+    ap.add_argument("--profile", choices=["uk", "us"], default="uk")
     a = ap.parse_args()
     if a.cmd == "push":
-        push()
+        push(profile=a.profile)
     elif a.cmd == "status":
-        status(remote=a.remote)
+        status(remote=a.remote, profile=a.profile)
     else:
-        pull(force=a.force)
+        pull(force=a.force, profile=a.profile)

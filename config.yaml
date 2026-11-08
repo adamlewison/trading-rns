@@ -84,3 +84,26 @@ backup:
   prefix: trading-rns/v1
   local_dir: null                 # for store: local
   interval_min: 30
+
+# ---------- US (SEC EDGAR) data collection — separate DB + raw cache ----------
+us:
+  db: data/us.duckdb
+  raw_dir: data/raw/us
+  start_year: 2012
+  # SEC fair-access policy: max 10 req/s. We stay at ~5.
+  min_interval_s: 0.2
+  # User-Agent comes from SEC_USER_AGENT in .env ("Name email"); required, never hard-coded.
+  forms: ["8-K", "8-K/A"]
+  earnings_items: ["2.02"]
+  news_items: ["1.01", "2.01", "7.01", "8.01"]
+  # companyfacts concepts extracted into us_facts (the whole zip is kept for anything else)
+  fact_concepts:
+    us-gaap: [Revenues, RevenueFromContractWithCustomerExcludingAssessedTax, SalesRevenueNet,
+              NetIncomeLoss, OperatingIncomeLoss, EarningsPerShareBasic, EarningsPerShareDiluted,
+              WeightedAverageNumberOfSharesOutstandingBasic, WeightedAverageNumberOfDilutedSharesOutstanding,
+              CommonStockSharesOutstanding, Assets, CashAndCashEquivalentsAtCarryingValue,
+              LongTermDebt, StockholdersEquity]
+    dei: [EntityCommonStockSharesOutstanding, EntityPublicFloat]
+  price_exchanges: [NYSE, Nasdaq]       # OTC and others skipped
+  benchmarks: [SPY, IWM]
+  disk_warn_gb: 20

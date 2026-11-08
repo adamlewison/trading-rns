@@ -1,4 +1,4 @@
-"""DuckDB connection + schema. One file: data/rns.duckdb."""
+"""DuckDB connection + UK schema (data/rns.duckdb). The US data lives in data/us.duckdb (ingest/us/db.py)."""
 from __future__ import annotations
 
 import time
@@ -83,27 +83,31 @@ CREATE TABLE IF NOT EXISTS scrape_progress (
 """
 
 
-def connect(read_only: bool = False, wait_s: float = 600) -> duckdb.DuckDBPyConnection:
+def connect(read_only: bool = False, wait_s: float = 600, db=None, schema: str | None = None
+            ) -> duckdb.DuckDBPyConnection:
     """DuckDB allows one writer *process* at a time. Long-running jobs therefore use short-lived
-    connections (see `session`), and we wait for the lock instead of crashing."""
+    connections (see `session`), and we wait for the lock instead of crashing.
+    `db`/`schema` default to the UK database; the US module passes its own (data/us.duckdb)."""
     cfg = load_config()
+    path = db or cfg["paths"]["db"]
+    schema = SCHEMA if schema is None else schema
     deadline = time.monotonic() + wait_s
     while True:
         try:
-            con = duckdb.connect(str(cfg["paths"]["db"]), read_only=read_only)
+            con = duckdb.connect(str(path), read_only=read_only)
             break
         except duckdb.IOException as e:
             if "lock" not in str(e).lower() or time.monotonic() > deadline:
                 raise
             time.sleep(1.0)
     if not read_only:
-        con.execute(SCHEMA)
+        con.execute(schema)
     return con
 
 
 @contextmanager
-def session(read_only: bool = False):
-    con = connect(read_only=read_only)
+def session(read_only: bool = False, db=None, schema: str | None = None):
+    con = connect(read_only=read_only, db=db, schema=schema)
     try:
         yield con
     finally:

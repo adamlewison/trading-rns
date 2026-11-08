@@ -120,3 +120,49 @@ tests/      pytest
 
 Adding another announcement source means implementing the `AnnouncementSource` protocol in
 `ingest/announcements/base.py` and registering it in `ingest/announcements/run.py::SOURCES`.
+
+## US data (SEC EDGAR): data collection only
+
+A second market for later comparison. **Separate database (`data/us.duckdb`) and raw cache
+(`data/raw/us/`)**, so it never contends for the UK database's lock. No LLM calls, features or
+backtests yet.
+
+```bash
+# needs SEC_USER_AGENT="Name email" in .env (SEC fair-access policy)
+uv run python -m ingest.us.run index          # EDGAR quarterly full-index 2012→: every 8-K / 8-K/A
+uv run python -m ingest.us.run tickers        # CIK ↔ ticker ↔ exchange (current companies only)
+uv run python -m ingest.us.run submissions    # bulk submissions.zip: items + filing metadata
+uv run python -m ingest.us.run estimate       # counts, disk and time estimate
+uv run python -m ingest.us.run docs --group earnings --yes   # Item 2.02 → filing index + Ex-99.1
+uv run python -m ingest.us.run docs --group news --yes       # 1.01 / 2.01 / 7.01 / 8.01
+uv run python -m ingest.us.run facts          # bulk companyfacts.zip → selected XBRL concepts
+uv run python -m ingest.us.run prices         # yfinance daily OHLCV, NYSE + Nasdaq, + SPY, IWM
+uv run python -m ingest.us.run report
+uv run python -m core.backup push --profile us   # B2 backup (separate prefix trading-rns/us/v1)
+```
+
+- **Rate:** about 5 requests per second to sec.gov (SEC's limit is 10), with an honest User-Agent,
+  every response cached, resumable, and a stop after 3 consecutive refusals.
+- **Timestamps:** the acceptance time comes from each filing's `-index.htm` page, which shows US
+  Eastern time, and is converted to UTC with DST handled. `session` is `pre_market` (before 09:30 ET),
+  `intraday` (09:30–16:00), `after_close` (16:00 or later) or `non_trading_day` (weekend). Exchange
+  holidays are not flagged yet; they'll be flagged from SPY's price calendar later.
+- **Documents:** Ex-99.1 (or the first EX-99.x) when present, otherwise the 8-K itself.
+- **Droplet:** `deploy/setup-us.sh` sets up a separate checkout and systemd services
+  (`trading-rns-us`, `trading-rns-us-backup`), putting the data on an attached DigitalOcean
+  volume if there is one.
+
+### US survivorship bias: options to fix it later (nothing bought)
+
+yfinance has **no price history for delisted US stocks**, so a backtest on today's tickers only
+sees survivors. EDGAR itself does include delisted companies, so the filings side is fine.
+Options for the prices, with rough prices as of Nov 2026 (check current pricing before buying):
+
+| Vendor | What | Rough cost |
+|---|---|---|
+| Norgate Data (Platinum) | US EOD incl. ~25k delisted, back to 1990; Windows-only, rented | ~$630 / year |
+| Sharadar (Nasdaq Data Link) | US EOD + fundamentals, delisted with dates/reasons, from 1997 | subscription; price not found, check |
+| FirstRate Data | ~16k US tickers from 2000, ~7k delisted, one-time purchase | ~$240 one-time |
+| FinzData | whole-US-market EOD bundles incl. 8.5k+ delisted, one-time | ~$195 (5 yrs) – $670 (30 yrs) |
+| Quandl/Nasdaq WIKI archive | free, includes delisted, but **frozen at March 2018** | free |
+| CRSP (via WRDS) | the academic gold standard | institutional or academic only |

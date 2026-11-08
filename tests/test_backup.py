@@ -52,3 +52,20 @@ def test_roundtrip_and_incremental(env):
         assert con.execute("SELECT count(*) FROM ann_bodies").fetchone()[0] == 2
         assert con.execute("SELECT name FROM universe").fetchone()[0] == "Abc plc"
     assert (raw / "a.gz").read_bytes() == b"page-a"
+
+
+def test_uk_backup_excludes_us_raw_cache(env):
+    tmp, backup = env
+    (tmp / "data/raw/html/a").mkdir(parents=True)
+    (tmp / "data/raw/html/a/uk.gz").write_bytes(b"uk")
+    (tmp / "data/raw/us/sec/x").mkdir(parents=True)
+    (tmp / "data/raw/us/sec/x/us.gz").write_bytes(b"us")
+    store = backup.LocalStore(tmp / "store")
+    backup.push(store)
+    import io
+    import tarfile
+    names = []
+    for n in store.list("t/v1/raw/"):
+        with tarfile.open(fileobj=io.BytesIO(store.get(n))) as t:
+            names += t.getnames()
+    assert names == ["html/a/uk.gz"]
