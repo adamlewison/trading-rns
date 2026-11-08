@@ -30,7 +30,8 @@ if ! grep -q '^SEC_USER_AGENT=' "$DIR/.env"; then
 fi
 cd "$DIR"
 uv sync -q
-[ -f data/us.duckdb ] || uv run python -W ignore -m core.backup pull --profile us
+# tables only: the cached raw pages stay in B2 (not needed to resume; saves disk)
+[ -f data/us.duckdb ] || uv run python -W ignore -m core.backup pull --profile us --skip-raw
 df -h "$DIR" | tail -1
 
 cat > /etc/systemd/system/trading-rns-us.service <<UNIT
@@ -54,7 +55,7 @@ After=network-online.target
 [Service]
 WorkingDirectory=$DIR
 Environment=PATH=/root/.local/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=/bin/bash -c 'while true; do uv run python -W ignore -m core.backup push --profile us >> data/logs/us_backup.out 2>&1; sleep 1800; done'
+ExecStart=/bin/bash -c 'while true; do uv run python -W ignore -m core.backup push --profile us --prune-raw >> data/logs/us_backup.out 2>&1; sleep 1800; done'
 Restart=always
 RestartSec=60
 [Install]

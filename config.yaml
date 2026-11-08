@@ -107,3 +107,7 @@ us:
   price_exchanges: [NYSE, Nasdaq]       # OTC and others skipped
   benchmarks: [SPY, IWM]
   disk_warn_gb: 20
+  # cached SEC pages are uploaded to B2 and deleted locally by the US backup loop
+  # (`core.backup push --profile us --prune-raw`), so the droplet only keeps the extracted text
+  prune_raw: true
+  min_free_gb: 3                        # docs download stops cleanly below this much free disk

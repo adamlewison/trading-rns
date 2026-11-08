@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import gzip
 import json
+import shutil
 import time
 import zipfile
 from datetime import date, datetime, timedelta
@@ -37,6 +38,7 @@ TICKERS_URL = f"{SEC}/files/company_tickers_exchange.json"
 
 # bytes per filing measured on a 400-filing pilot (Nov 2026): gzipped header page + gzipped
 # document in the raw cache + extracted text in DuckDB (~1/3 of chars after compression)
+EST_TEXT_BYTES = {"earnings": 10_000, "news": 5_500}   # extracted text kept in us.duckdb
 EST_BYTES = {"earnings": 1_800 + 21_500 + 10_000, "news": 1_800 + 8_100 + 5_500}
 
 
@@ -194,7 +196,6 @@ def estimate() -> dict:
            "earnings_hours_at_5rps": n_e * 2 / 5 / 3600, "news_hours_at_5rps": n_n * 2 / 5 / 3600,
            "bulk_zips_gb": 3.0, "facts_db_gb": 0.6}
     est["total_gb"] = est["earnings_gb"] + est["news_gb"] + est["bulk_zips_gb"] + est["facts_db_gb"]
-    import shutil
     est["free_gb"] = shutil.disk_usage(c["raw_dir"]).free / 1e9
     for k, v in est.items():
         print(f"{k:24} {v:,.2f}" if isinstance(v, float) else f"{k:24} {v:,}")
@@ -208,8 +209,10 @@ def docs(group: str, limit: int | None, assume_yes: bool, year: int | None = Non
         sql = _target_sql(group) + (f" AND year(f.filing_date) = {int(year)}" if year else "")
         sql += " ORDER BY " + ("hash(f.accession)" if random else "f.filing_date DESC")
         todo = con.execute(sql + (f" LIMIT {int(limit)}" if limit else "")).fetchall()
-    check_disk(len(todo) * EST_BYTES[group], f"{group} documents",
-               interactive=True, assume_yes=assume_yes)
+    # with prune_raw the cached pages move to the B2 backup every 30 min, so only the text stays local
+    est = len(todo) * (EST_TEXT_BYTES[group] if c.get("prune_raw") else EST_BYTES[group])
+    check_disk(est, f"{group} documents", interactive=True, assume_yes=assume_yes)
+    min_free = float(c.get("min_free_gb", 3)) * 1e9
     log.info("docs[%s]: %d filings to fetch", group, len(todo))
     buf, consecutive_blocks = [], 0
 
@@ -263,6 +266,9 @@ def docs(group: str, limit: int | None, assume_yes: bool, year: int | None = Non
                     row["status"], datetime.now()])
         if len(buf) >= 50 or i == len(todo):
             flush()
+            if shutil.disk_usage(c["raw_dir"]).free < min_free:
+                log.error("STOPPING: free disk below %.1f GB (rerun resumes; free space first)", min_free / 1e9)
+                raise SystemExit(4)
         if i % 500 == 0:
             log.info("docs[%s] %d/%d | net=%d cache=%d", group, i, len(todo), client.n_network, client.n_cache)
     flush()

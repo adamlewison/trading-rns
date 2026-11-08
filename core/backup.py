@@ -58,6 +58,7 @@ class Profile:
     status_name: str
     status_fn: Callable[[], dict] | None = None
     raw_exclude: tuple[str, ...] = ()   # top-level subfolders of raw_dir that belong to another profile
+    can_prune_raw: bool = False         # may local raw files be deleted once safely in the store?
 
 
 def get_profile(name: str = "uk") -> Profile:
@@ -75,7 +76,7 @@ def get_profile(name: str = "uk") -> Profile:
                        ["sec_form_index", "sec_companies", "sec_filings", "sec_ticker_map", "us_facts",
                         "us_prices_daily", "us_price_download_log", "us_progress"],
                        "us_filing_docs", u["db"].parent / "backup_manifest_us.json", "us_status.json",
-                       _us_status)
+                       _us_status, can_prune_raw=True)
     raise ValueError(name)
 
 
@@ -213,8 +214,13 @@ def _content_hash(con, table: str) -> str:
     return f"{h[0]}:{h[1]}"
 
 
-def push(store: Store | None = None, profile: str = "uk") -> dict:
+def push(store: Store | None = None, profile: str = "uk", prune_raw: bool = False) -> dict:
+    """prune_raw: after a raw part has been uploaded (and the manifest saved), delete those local
+    files to save disk. Only allowed for profiles that opt in (US): the database rows already
+    hold the extracted text, and `pull` brings the raw files back if they're ever needed."""
     pf = get_profile(profile)
+    if prune_raw and not pf.can_prune_raw:
+        raise SystemExit(f"--prune-raw is not allowed for profile {pf.name}")
     prefix = pf.prefix
     store = store or get_store()
     m = _load_manifest(store, prefix, pf.manifest)
@@ -246,7 +252,7 @@ def push(store: Store | None = None, profile: str = "uk") -> dict:
     files = sorted((p for p in raw_dir.rglob("*.gz")
                     if p.stat().st_mtime > since and p.relative_to(raw_dir).parts[0] not in pf.raw_exclude),
                    key=lambda p: p.stat().st_mtime) if raw_dir.exists() else []
-    part, size, n = [], 0, 0
+    part, size, n, pruned = [], 0, 0, 0
     for i, f in enumerate(files):
         part.append(f)
         size += f.stat().st_size
@@ -259,6 +265,10 @@ def push(store: Store | None = None, profile: str = "uk") -> dict:
             m["raw_watermark"] = part[-1].stat().st_mtime
             uploaded.append((f"raw part {n} ({len(part)} files)", buf.tell()))
             _save_manifest(store, prefix, m, pf.manifest)   # checkpoint after each raw part
+            if prune_raw:   # store.put raised if the upload failed (B2 also checks the SHA1), so it's safe
+                for p in part:
+                    p.unlink(missing_ok=True)
+                pruned += len(part)
             part, size, n = [], 0, n + 1
     _save_manifest(store, prefix, m, pf.manifest)
     try:
@@ -268,9 +278,16 @@ def push(store: Store | None = None, profile: str = "uk") -> dict:
         log.warning("status upload failed: %s", e)
     for what, nbytes in uploaded:
         log.info("[%s] pushed %s: %.1f MB", pf.name, what, nbytes / 1e6)
+    if pruned:
+        log.info("[%s] pruned %d local raw files (now only in the backup)", pf.name, pruned)
     if not uploaded:
         log.info("[%s] nothing new to push", pf.name)
     return m
+
+
+def _free_gb(path: Path) -> float:
+    import shutil
+    return round(shutil.disk_usage(path).free / 1e9, 2)
 
 
 def _status(cfg) -> dict:
@@ -290,6 +307,7 @@ def _status(cfg) -> dict:
     procs = subprocess.run(["pgrep", "-fa", "run_full|backup_loop|ingest\\."], capture_output=True, text=True).stdout
     return {"host": platform.node(), "at": datetime.now().isoformat(),
             "uptime": Path("/proc/uptime").read_text().split()[0] if Path("/proc/uptime").exists() else None,
+            "disk_free_gb": _free_gb(cfg["paths"]["data_dir"]),
             "progress": prog, "bodies": bodies, "processes": procs.splitlines()[:10],
             "announcements_log": tail("announcements.log"), "full_run": tail("full_run.out", 8),
             "http_errors": [l for l in tail("http.log", 200) if "WARNING" in l or "ERROR" in l][-10:]}
@@ -307,11 +325,12 @@ def _us_status() -> dict:
                               ORDER BY ALL""").df().to_dict("records")
     return {"host": platform.node(), "at": datetime.now().isoformat(),
             "uptime": Path("/proc/uptime").read_text().split()[0] if Path("/proc/uptime").exists() else None,
+            "disk_free_gb": _free_gb(u["db"].parent),
             "progress": prog[-8:], "docs": docs,
             "us_log": f.read_text(errors="replace").splitlines()[-15:] if f.exists() else []}
 
 
-def pull(store: Store | None = None, force: bool = False, profile: str = "uk") -> None:
+def pull(store: Store | None = None, force: bool = False, profile: str = "uk", skip_raw: bool = False) -> None:
     pf = get_profile(profile)
     prefix = pf.prefix
     db_path: Path = pf.db
@@ -341,7 +360,7 @@ def pull(store: Store | None = None, force: bool = False, profile: str = "uk") -
                 FROM read_parquet('{d}/b*.parquet')) WHERE rn = 1""")
     raw_dir: Path = pf.raw_dir
     raw_dir.mkdir(parents=True, exist_ok=True)
-    for name in sorted(n for n in names if n.startswith(f"{prefix}/raw/")):
+    for name in ([] if skip_raw else sorted(n for n in names if n.startswith(f"{prefix}/raw/"))):
         with tarfile.open(fileobj=io.BytesIO(store.get(name))) as tar:
             tar.extractall(raw_dir, filter="data")
     remote = store.get(f"{prefix}/manifest.json")
@@ -371,10 +390,12 @@ if __name__ == "__main__":
     ap.add_argument("--force", action="store_true")
     ap.add_argument("--remote", action="store_true", help="status: show the status file the VPS uploads")
     ap.add_argument("--profile", choices=["uk", "us"], default="uk")
+    ap.add_argument("--prune-raw", action="store_true", help="push (us only): delete local raw files once backed up")
+    ap.add_argument("--skip-raw", action="store_true", help="pull: restore tables only, not the raw-file cache")
     a = ap.parse_args()
     if a.cmd == "push":
-        push(profile=a.profile)
+        push(profile=a.profile, prune_raw=a.prune_raw)
     elif a.cmd == "status":
         status(remote=a.remote, profile=a.profile)
     else:
-        pull(force=a.force, profile=a.profile)
+        pull(force=a.force, profile=a.profile, skip_raw=a.skip_raw)

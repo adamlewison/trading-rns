@@ -10,7 +10,8 @@ def env(tmp_path, monkeypatch):
     cfg = tmp_path / "config.yaml"
     cfg.write_text(f"""
 paths: {{data_dir: {tmp_path}/data, db: {tmp_path}/data/rns.duckdb, raw_dir: {tmp_path}/data/raw, log_dir: {tmp_path}/data/logs}}
-backup: {{store: local, local_dir: {tmp_path}/store, prefix: t/v1}}
+backup: {{store: local, local_dir: {tmp_path}/store, prefix: trading-rns/v1}}
+us: {{db: {tmp_path}/data/us.duckdb, raw_dir: {tmp_path}/data/raw/us, disk_warn_gb: 20}}
 """)
     monkeypatch.setenv("RNS_CONFIG", str(cfg))
     import core.config
@@ -33,13 +34,13 @@ def test_roundtrip_and_incremental(env):
 
     store = backup.LocalStore(tmp / "store")
     backup.push(store)
-    n1 = len(store.list("t/v1/"))
+    n1 = len(store.list("trading-rns/v1/"))
 
     # second push with one new body: only a new body part + manifest change
     with session() as con:
         con.execute("INSERT INTO ann_bodies VALUES ('s:2', 'text two', 8, 'ok', TIMESTAMP '2026-01-02 10:00')")
     backup.push(store)
-    names = store.list("t/v1/")
+    names = store.list("trading-rns/v1/")
     assert len(names) == n1 + 1
     assert len([n for n in names if "/ann_bodies/" in n]) == 2
 
@@ -65,7 +66,35 @@ def test_uk_backup_excludes_us_raw_cache(env):
     import io
     import tarfile
     names = []
-    for n in store.list("t/v1/raw/"):
+    for n in store.list("trading-rns/v1/raw/"):
         with tarfile.open(fileobj=io.BytesIO(store.get(n))) as t:
             names += t.getnames()
     assert names == ["html/a/uk.gz"]
+
+
+def test_prune_raw_only_for_us_and_restorable(env, monkeypatch):
+    tmp, backup = env
+    store = backup.LocalStore(tmp / "store")
+    with pytest.raises(SystemExit):
+        backup.push(store, profile="uk", prune_raw=True)   # UK cache is never pruned
+
+    monkeypatch.setenv("US_DB", str(tmp / "data/us.duckdb"))
+    monkeypatch.setenv("US_RAW_DIR", str(tmp / "data/raw/us"))
+    from core.db import session
+    from ingest.us.common import US_SCHEMA
+    with session(db=tmp / "data/us.duckdb", schema=US_SCHEMA) as con:
+        con.execute("INSERT INTO us_progress VALUES ('k', 'done', 1, now())")
+    f = tmp / "data/raw/us/sec/www.sec.gov/ab/page.gz"
+    f.parent.mkdir(parents=True)
+    f.write_bytes(b"sec-page")
+    backup.push(store, profile="us", prune_raw=True)
+    assert not f.exists()                                  # pruned locally ...
+    backup.push(store, profile="us", prune_raw=True)       # ... and a re-push doesn't choke
+
+    (tmp / "data/us.duckdb").unlink()
+    backup.pull(store, profile="us", skip_raw=True)
+    assert not f.exists()
+    with session(db=tmp / "data/us.duckdb", schema=US_SCHEMA) as con:
+        assert con.execute("SELECT count(*) FROM us_progress").fetchone()[0] == 1
+    backup.pull(store, profile="us", force=True)
+    assert f.read_bytes() == b"sec-page"                   # ... but restorable from the backup

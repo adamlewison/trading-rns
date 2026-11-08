@@ -148,6 +148,11 @@ uv run python -m core.backup push --profile us   # B2 backup (separate prefix tr
   `intraday` (09:30–16:00), `after_close` (16:00 or later) or `non_trading_day` (weekend). Exchange
   holidays are not flagged yet; they'll be flagged from SPY's price calendar later.
 - **Documents:** Ex-99.1 (or the first EX-99.x) when present, otherwise the 8-K itself.
+- **Disk:** the US backup loop runs `core.backup push --profile us --prune-raw`. Every 30 minutes the
+  cached SEC pages are uploaded to B2 and **deleted locally**, so the droplet keeps only the extracted
+  text in `us.duckdb` (about 4–6GB for everything instead of about 20GB). `core.backup pull --profile us`
+  brings the pages back if they're ever needed, and `--skip-raw` restores the tables only. The download
+  stops cleanly (exit 4) if free disk drops below `us.min_free_gb` (3GB). The UK cache is never pruned.
 - **Droplet:** `deploy/setup-us.sh` sets up a separate checkout and systemd services
   (`trading-rns-us`, `trading-rns-us-backup`), putting the data on an attached DigitalOcean
   volume if there is one.
