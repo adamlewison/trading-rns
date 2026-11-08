@@ -111,6 +111,20 @@ results look better than they really are is flagged with ⚠️.
   scrape them. The market-maker file is downloaded by hand and imported with
   `ingest.uk.trading_service import-mm`.
 
+## Phase 2: LLM classification (both markets)
+
+- **Model:** Claude Haiku 5.5 through Anthropic's Batch API (decided 2026-11-08). Estimated cost:
+  ~£40 for the UK announcements, ~£110 for US earnings 8-Ks, ~£170 for US news 8-Ks. The
+  500-announcement pilot (~15p) measures real token counts before any full run.
+- **⚠️ Look-ahead bias from the model's own knowledge:** the model was trained on news up to
+  2025–26, so it may "know" how a company's story ended (e.g. later administration) and let that
+  colour its labels. That would flatter a backtest. Mitigation: company names, TIDMs and tickers are
+  stripped from the text before classification (`llm.anonymise`). It's imperfect, because distinctive
+  details (project names, places) can still identify a company. Label quality should be compared on
+  pre- and post-training-cutoff announcements.
+- **Model drift:** API models get retired, so labels can't be regenerated with the exact same model
+  later. The raw responses are stored so labels never have to be regenerated.
+
 ## US
 
 ### SEC EDGAR filings

@@ -92,7 +92,10 @@ us:
 # ---------- later phases (placeholders, used from Phase 2 on) ----------
 llm:
   provider: anthropic             # anthropic | openai_compatible (e.g. Vercel AI Gateway)
-  model: claude-haiku-5-5
+  model: claude-haiku-5-5          # decided 2026-11-08: Haiku 5.5 via Anthropic Batch API (50% off)
+  batch: true
+  effort: low                     # classification; keeps thinking tokens (billed as output) down
+  anonymise: true                 # strip company name/TIDM/ticker before sending (look-ahead bias)
   base_url: null                  # for openai_compatible
   confirm_cost_above_gbp: 5.0
   pilot_size: 500

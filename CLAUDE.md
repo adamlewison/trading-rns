@@ -6,7 +6,7 @@ Research: do UK small-cap/AIM shares drift 1–3 days after pre-08:00 RNS news, 
 - **Phase 1 (data):**
   - UK announcement-text download is running on the droplet.
   - US: metadata, facts and prices are done; the document download is set up via `deploy/setup-us.sh`.
-- **Phases 2–5 (LLM classification, features/labels, backtest, live):** not started.
+- **Phases 2–5 (LLM classification, features/labels, backtest, live):** not started. Phase 2 model is decided: Haiku 5.5 via Anthropic Batch API, anonymised text, pilot of 500 first (see ASSUMPTIONS.md).
 
 ## Working rules
 - Go phase by phase. **Stop at the end of each phase**, report, and wait for the user's go-ahead.
