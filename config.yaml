@@ -101,11 +101,20 @@ llm:
   pilot_size: 500
   context_prev_announcements: 3
 
-costs:
+costs:                            # UK
   slippage_pct: 0.25              # each side, % of price
   stamp_duty_non_aim_pct: 0.5     # buys only
   stamp_duty_aim_pct: 0.0
   commission_gbp: 0.0             # Trading 212
+  spread_multiplier: 1.0          # robustness: 1.5, 2.0
+
+us_costs:                         # IBKR Pro fixed pricing (check current rates before going live)
+  commission_per_share_usd: 0.005
+  commission_min_usd: 1.0
+  commission_max_pct: 1.0         # IBKR caps at 1% of trade value
+  fx_pct: 0.03                    # GBP→USD conversion, each way
+  slippage_pct: 0.10              # each side, on top of half the spread; small caps can be far worse
+  spread_source: estimate         # no historical quotes yet: estimated from daily high/low (Corwin–Schultz)
   spread_multiplier: 1.0          # robustness: 1.5, 2.0
 
 labels:

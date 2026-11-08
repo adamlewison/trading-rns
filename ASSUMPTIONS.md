@@ -151,3 +151,19 @@ results look better than they really are is flagged with ⚠️.
 - **Company facts:** a fixed list of XBRL concepts (config `us.fact_concepts`) is extracted, and
   the whole `companyfacts.zip` is kept so other concepts can be added later. `filed` is the
   point-in-time date to use. Facts come from 10-K/10-Q filings, so they lag 8-K earnings releases.
+
+### US as a trading market (not just a comparison)
+
+- **⚠️ Survivorship is NOT solved by EDGAR.** EDGAR has the filings of dead companies, but our
+  prices (yfinance) only cover today's tickers. Companies that failed after bad news drop out of the
+  backtest, so results look better than reality. This is the biggest open gap for a US decision, and
+  needs a delisted price source (README lists options; nothing bought).
+- **⚠️ The news is often public before the 8-K.** Earnings usually go out on a newswire first and
+  the 8-K is accepted minutes to hours later. Professionals react to the wire, so the strategy must
+  only count drift **after** the price we could actually trade at (the next open), never from the
+  previous close.
+- **Post-earnings drift has weakened** since it was first documented, especially in liquid stocks.
+  What remains tends to be in small, illiquid names, where spreads and slippage are highest.
+  Results will be reported by size and liquidity bucket.
+- **Spreads:** no free historical quotes, so the spread is estimated from daily high/low. That's
+  rough, and results are rerun with 1.5× and 2× spreads.

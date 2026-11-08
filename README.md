@@ -1,13 +1,19 @@
-# trading-rns: do small caps drift after pre-open news?
+# trading-rns: trade the drift after company news
 
-The hypothesis being tested:
+**Goal: an automated trading system that makes money after costs.** It isn't tied to one market or
+one strategy; whatever wins in an honest backtest gets traded.
 
-> UK small-cap / AIM shares underreact to RNS announcements published before the 08:00 open, and
-> some news types keep drifting for 1–3 days. If so, a rule like "buy ~08:05, +5% target, −3% stop,
-> exit by day 3" could be profitable **after realistic costs**.
+The first strategy being tested: a company publishes news outside market hours, Claude reads and
+labels it, a model scores it, and strong signals are bought at the open with a bracket exit
+(e.g. +5% target, −3% stop, out by day 3). This only works if prices underreact and keep drifting
+for 1–3 days.
 
-The UK is the primary market. US companies' SEC 8-K filings (earnings and other material news) are
-collected the same way, as a second market to compare against later.
+Two candidate markets, built the same way and judged on the same terms:
+- **US** (SEC 8-K filings, IBKR execution): low costs (no stamp duty, tight spreads, $0.005/share),
+  continuous order books, and free, official, timestamped filings. Competition is fiercer, so any
+  edge may be smaller.
+- **UK** (RNS announcements on AIM / small caps): possibly a bigger underreaction, but stamp duty
+  on non-AIM shares, 2–3% spreads, and thin fills on small caps.
 
 The aim is an honest answer. Every assumption that might flatter results is listed in
 [`ASSUMPTIONS.md`](ASSUMPTIONS.md). Read it before trusting any number.
