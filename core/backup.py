@@ -285,6 +285,65 @@ def push(store: Store | None = None, profile: str = "uk", prune_raw: bool = Fals
     return m
 
 
+BULK_CHUNK = 200 * 1024 * 1024
+
+
+def push_bulk(store: Store | None = None, profile: str = "us") -> None:
+    """Upload the bulk downloads (SEC submissions.zip / companyfacts.zip) in 200MB chunks, so
+    nothing scraped exists only on one machine. Each version is kept under its own date; already
+    uploaded chunks are skipped (resumable). Restore with pull_bulk."""
+    pf = get_profile(profile)
+    bulk_dir = pf.raw_dir.parent / "bulk"
+    store = store or get_store()
+    m = _load_manifest(store, pf.prefix, pf.manifest)
+    done = m.setdefault("bulk", {})
+    for f in sorted(bulk_dir.glob("*")) if bulk_dir.exists() else []:
+        st = f.stat()
+        ver = f"{f.name}@{datetime.fromtimestamp(st.st_mtime):%Y%m%d}-{st.st_size}"
+        rec = done.setdefault(ver, {"chunks": 0, "complete": False})
+        if rec["complete"]:
+            continue
+        n_chunks = -(-st.st_size // BULK_CHUNK)
+        sha = hashlib.sha256()
+        with f.open("rb") as fh:
+            for i in range(n_chunks):
+                data = fh.read(BULK_CHUNK)
+                sha.update(data)
+                if i < rec["chunks"]:
+                    continue
+                store.put(f"{pf.prefix}/bulk/{ver}/chunk-{i:04d}", data)
+                rec["chunks"] = i + 1
+                _save_manifest(store, pf.prefix, m, pf.manifest)
+                log.info("[%s] bulk %s chunk %d/%d", pf.name, f.name, i + 1, n_chunks)
+        rec.update(complete=True, name=f.name, size=st.st_size, sha256=sha.hexdigest(), n_chunks=n_chunks)
+        _save_manifest(store, pf.prefix, m, pf.manifest)
+        log.info("[%s] bulk %s backed up (%.2f GB)", pf.name, f.name, st.st_size / 1e9)
+
+
+def pull_bulk(store: Store | None = None, profile: str = "us") -> None:
+    """Restore the latest backed-up version of each bulk file, verifying its SHA-256."""
+    pf = get_profile(profile)
+    store = store or get_store()
+    m = _load_manifest(store, pf.prefix, pf.manifest)
+    latest = {}
+    for ver, rec in sorted(m.get("bulk", {}).items()):
+        if rec.get("complete"):
+            latest[rec["name"]] = (ver, rec)
+    out_dir = pf.raw_dir.parent / "bulk"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for name, (ver, rec) in latest.items():
+        tmp, sha = out_dir / (name + ".partial"), hashlib.sha256()
+        with tmp.open("wb") as fh:
+            for i in range(rec["n_chunks"]):
+                data = store.get(f"{pf.prefix}/bulk/{ver}/chunk-{i:04d}")
+                sha.update(data)
+                fh.write(data)
+        if sha.hexdigest() != rec["sha256"]:
+            raise RuntimeError(f"checksum mismatch restoring {name}")
+        tmp.rename(out_dir / name)
+        log.info("[%s] restored bulk %s", pf.name, name)
+
+
 def _free_gb(path: Path) -> float:
     import shutil
     return round(shutil.disk_usage(path).free / 1e9, 2)
@@ -386,7 +445,7 @@ def status(store: Store | None = None, remote: bool = False, profile: str = "uk"
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["push", "pull", "status"])
+    ap.add_argument("cmd", choices=["push", "pull", "status", "push-bulk", "pull-bulk"])
     ap.add_argument("--force", action="store_true")
     ap.add_argument("--remote", action="store_true", help="status: show the status file the VPS uploads")
     ap.add_argument("--profile", choices=["uk", "us"], default="uk")
@@ -395,6 +454,10 @@ if __name__ == "__main__":
     a = ap.parse_args()
     if a.cmd == "push":
         push(profile=a.profile, prune_raw=a.prune_raw)
+    elif a.cmd == "push-bulk":
+        push_bulk(profile=a.profile)
+    elif a.cmd == "pull-bulk":
+        pull_bulk(profile=a.profile)
     elif a.cmd == "status":
         status(remote=a.remote, profile=a.profile)
     else:

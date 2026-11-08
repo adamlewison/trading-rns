@@ -153,6 +153,10 @@ uv run python -m core.backup push --profile us   # B2 backup (separate prefix tr
   text in `us.duckdb` (about 4–6GB for everything instead of about 20GB). `core.backup pull --profile us`
   brings the pages back if they're ever needed, and `--skip-raw` restores the tables only. The download
   stops cleanly (exit 4) if free disk drops below `us.min_free_gb` (3GB). The UK cache is never pruned.
+- **Nothing scraped is ever thrown away.** A local file is only deleted after its upload succeeded
+  (B2 checks the SHA1). Backup files of scraped pages are never overwritten. The bulk SEC zips are
+  backed up too, in 200MB chunks per dated version: `core.backup push-bulk --profile us`,
+  restored with `pull-bulk` (SHA-256 verified).
 - **Droplet:** `deploy/setup-us.sh` sets up a separate checkout and systemd services
   (`trading-rns-us`, `trading-rns-us-backup`), putting the data on an attached DigitalOcean
   volume if there is one.

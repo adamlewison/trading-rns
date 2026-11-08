@@ -98,3 +98,21 @@ def test_prune_raw_only_for_us_and_restorable(env, monkeypatch):
         assert con.execute("SELECT count(*) FROM us_progress").fetchone()[0] == 1
     backup.pull(store, profile="us", force=True)
     assert f.read_bytes() == b"sec-page"                   # ... but restorable from the backup
+
+
+def test_bulk_chunked_roundtrip(env, monkeypatch):
+    tmp, backup = env
+    monkeypatch.setattr(backup, "BULK_CHUNK", 10)
+    bulk = tmp / "data/raw/us/bulk"
+    bulk.mkdir(parents=True)
+    payload = bytes(range(256)) * 3
+    (bulk / "submissions.zip").write_bytes(payload)
+    store = backup.LocalStore(tmp / "store")
+    backup.push_bulk(store)
+    n = len(store.list("trading-rns/us/v1/bulk/"))
+    assert n == -(-len(payload) // 10)
+    backup.push_bulk(store)                                # already complete: nothing re-uploaded
+    assert len(store.list("trading-rns/us/v1/bulk/")) == n
+    (bulk / "submissions.zip").unlink()
+    backup.pull_bulk(store)
+    assert (bulk / "submissions.zip").read_bytes() == payload
