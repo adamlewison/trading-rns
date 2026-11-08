@@ -1,7 +1,7 @@
-"""Price data-quality flags (pure functions; tested)."""
+"""Shared Yahoo daily-price helpers used by both markets (pure functions; tested):
+tidy a yfinance frame into our columns, and flag stale / suspect rows."""
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 
 
@@ -28,3 +28,20 @@ def flag_prices(df: pd.DataFrame, glitch_ratio: float = 30.0) -> pd.DataFrame:
     shift = ((r_prev >= glitch_ratio) | (r_prev <= 1 / glitch_ratio)) & ~spike.shift(1, fill_value=False)
     df["is_suspect"] = (bad_bar | spike | shift).fillna(False).astype(bool)
     return df
+
+
+def tidy_yahoo(raw: pd.DataFrame, symbol: str, glitch_ratio: float, key: str = "tidm") -> pd.DataFrame:
+    """One ticker's yfinance frame -> [key, date, open, high, low, close, adj_close, volume,
+    is_stale, is_suspect]. `key` names the ticker column ("tidm" for UK, "ticker" for US)."""
+    cols = [key, "date", "open", "high", "low", "close", "adj_close", "volume", "is_stale", "is_suspect"]
+    df = raw.rename(columns={"Open": "open", "High": "high", "Low": "low", "Close": "close",
+                             "Adj Close": "adj_close", "Volume": "volume"})
+    df = df.reset_index().rename(columns={"Date": "date"})
+    df["date"] = pd.to_datetime(df["date"]).dt.tz_localize(None).dt.date
+    df = df.dropna(subset=["open", "high", "low", "close"], how="all")
+    df = df.dropna(subset=["close"])
+    if df.empty:
+        return df
+    df[key] = symbol
+    df = flag_prices(df, glitch_ratio)
+    return df[cols].drop_duplicates([key, "date"])

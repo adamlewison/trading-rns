@@ -2,7 +2,7 @@ import io
 
 import pandas as pd
 
-from ingest.uk_trading_service import parse_mm_file, parse_service_map
+from ingest.uk.trading_service import parse_mm_file, parse_service_map
 
 
 def _xlsx(frames: dict[str, pd.DataFrame], startrow=0) -> bytes:

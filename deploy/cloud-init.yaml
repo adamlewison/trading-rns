@@ -1,5 +1,5 @@
 #cloud-config
-# No secrets in here: deploy/setup.sh asks for them interactively.
+# No secrets in here: deploy/setup-uk.sh asks for them interactively.
 package_update: true
 packages: [git, curl, ca-certificates]
 swap:

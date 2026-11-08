@@ -1,4 +1,4 @@
-from ingest.names import normalise_name, tidm_to_yahoo
+from ingest.uk.names import normalise_name, tidm_to_yahoo
 
 
 def test_tidm_to_yahoo():

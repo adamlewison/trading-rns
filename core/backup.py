@@ -1,14 +1,19 @@
-"""Off-machine backup of data/ to object storage, so a reclaimed container loses nothing.
+"""Off-machine backup of each market's data to object storage (Backblaze B2), so nothing scraped
+exists only on one machine. Same layout for every market; what each one backs up is declared in
+ingest/<market>/backup.py.
 
-    uv run python -m core.backup push      # incremental upload
-    uv run python -m core.backup pull      # restore into an empty data/ (fresh container)
-    uv run python -m core.backup status
+    uv run python -m core.backup push   --profile uk|us [--prune-raw]   # incremental upload
+    uv run python -m core.backup pull   --profile uk|us [--skip-raw]    # restore into an empty data/
+    uv run python -m core.backup status --profile uk|us [--remote]
+    uv run python -m core.backup push-bulk | pull-bulk --profile us     # large bulk files, chunked
 
-What is backed up (under <prefix>/):
-  db/<table>.parquet            full snapshot of each small table, uploaded only if changed
-  db/ann_bodies/part-*.parquet  incremental: rows fetched since the last push
-  raw/part-*.tar                incremental: cached raw downloads (data/raw) written since last push
-  manifest.json                 watermarks + hashes
+What is backed up (under the market's backup_prefix/):
+  db/<table>.parquet               full snapshot of each small table, uploaded only if changed
+  db/<incr_table>/part-*.parquet   incremental: rows fetched since the last push
+  raw/part-*.tar                   incremental: cached raw downloads since the last push (never overwritten)
+  bulk/<file>@<date>-<size>/chunk-*  bulk downloads in 200MB chunks, one folder per version
+  status/<name>.json               progress report from the machine running the scrape
+  manifest.json                    watermarks + hashes
 
 Storage is private and only for personal research: the scraped text is never published.
 Credentials: on your own machine, B2_KEY_ID / B2_APP_KEY in .env (gitignored). In the cloud
@@ -19,65 +24,52 @@ from __future__ import annotations
 import argparse
 import base64
 import hashlib
+import importlib
 import io
 import json
 import os
 import tarfile
 import tempfile
 import time
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from dataclasses import dataclass
 from typing import Callable, Protocol
 from urllib.parse import quote
 
 import httpx
 
-from core.config import load_config
-from core.db import SCHEMA, session
+from core.config import MARKETS, load_config
+from core.db import session
 from core.log import get_logger
 
 log = get_logger("backup")
 
-SNAPSHOT_TABLES = ["lse_instruments", "lse_issuer_snapshots", "universe", "prices_daily",
-                   "price_download_log", "ann_index", "scrape_progress"]
 RAW_PART_MAX_BYTES = 400 * 1024 * 1024
 
 
 @dataclass
 class Profile:
-    """What to back up. 'uk' is the original layout (unchanged); 'us' is the SEC EDGAR data."""
+    """What one market backs up. Each market declares its own in ingest/<market>/backup.py."""
     name: str
-    prefix: str
+    prefix: str                         # folder in the bucket
     db: Path
     schema: str
-    raw_dir: Path
-    snapshot_tables: list[str]
-    incr_table: str                 # append-only table backed up incrementally by fetched_at
+    raw_dir: Path                       # cached raw downloads (tar parts are relative to this)
+    snapshot_tables: list[str]          # small tables: full snapshot when changed
+    incr_table: str                     # large append-only table, backed up incrementally by fetched_at
+    incr_key: str                       # its primary key (dedup on restore)
     manifest: Path
     status_name: str
     status_fn: Callable[[], dict] | None = None
-    raw_exclude: tuple[str, ...] = ()   # top-level subfolders of raw_dir that belong to another profile
     can_prune_raw: bool = False         # may local raw files be deleted once safely in the store?
+    bulk_dir: Path | None = None        # large single files backed up in chunks (push-bulk)
 
 
 def get_profile(name: str = "uk") -> Profile:
-    cfg = load_config()
-    prefix = cfg.get("backup", {}).get("prefix", "trading-rns/v1")
-    if name == "uk":
-        return Profile("uk", prefix, cfg["paths"]["db"], SCHEMA, cfg["paths"]["raw_dir"], SNAPSHOT_TABLES,
-                       "ann_bodies", cfg["paths"]["data_dir"] / "backup_manifest.json", "status.json",
-                       lambda: _status(cfg), raw_exclude=("us",))
-    if name == "us":
-        from ingest.us.common import US_SCHEMA, us_cfg
-        u = us_cfg()
-        return Profile("us", prefix.replace("trading-rns/", "trading-rns/us/"), u["db"], US_SCHEMA,
-                       u["raw_dir"] / "sec",
-                       ["sec_form_index", "sec_companies", "sec_filings", "sec_ticker_map", "us_facts",
-                        "us_prices_daily", "us_price_download_log", "us_progress"],
-                       "us_filing_docs", u["db"].parent / "backup_manifest_us.json", "us_status.json",
-                       _us_status, can_prune_raw=True)
-    raise ValueError(name)
+    if name not in MARKETS:
+        raise ValueError(f"unknown profile {name!r}")
+    return importlib.import_module(f"ingest.{name}.backup").profile()
 
 
 class Store(Protocol):
@@ -221,26 +213,36 @@ def push(store: Store | None = None, profile: str = "uk", prune_raw: bool = Fals
     pf = get_profile(profile)
     if prune_raw and not pf.can_prune_raw:
         raise SystemExit(f"--prune-raw is not allowed for profile {pf.name}")
+    if not pf.db.exists():   # never create an empty DB and back that up over the real one
+        raise SystemExit(f"[{pf.name}] no database at {pf.db}: nothing to back up "
+                         "(old data layout? run deploy/migrate-layout.sh; fresh machine? `pull` first)")
     prefix = pf.prefix
     store = store or get_store()
     m = _load_manifest(store, prefix, pf.manifest)
+    rows = m.setdefault("table_rows", {})
     stamp = datetime.now().strftime("%Y%m%dT%H%M%S%f")  # unique per push; parts are never overwritten
     uploaded = []
 
-    with session(db=pf.db, schema=pf.schema) as con:
+    with session(pf.db, pf.schema) as con:
         exports = {}
         for t in pf.snapshot_tables:
             h = _content_hash(con, t)
             if m["tables"].get(t) != h:
-                exports[t] = (h, _export(con, f"SELECT * FROM {t}"))
+                n = con.execute(f"SELECT count(*) FROM {t}").fetchone()[0]
+                if n == 0 and rows.get(t, 0) > 0:   # an emptied table never overwrites a good snapshot
+                    log.error("[%s] %s is empty locally but has %d rows in the backup: NOT overwriting",
+                              pf.name, t, rows[t])
+                    continue
+                exports[t] = (h, n, _export(con, f"SELECT * FROM {t}"))
         wm = m.get("bodies_watermark")
         where = f"WHERE fetched_at > TIMESTAMP '{wm}'" if wm else ""
         new_wm = con.execute(f"SELECT max(fetched_at) FROM {pf.incr_table} {where}").fetchone()[0]
         bodies = _export(con, f"SELECT * FROM {pf.incr_table} {where}") if new_wm else None
     # uploads happen outside the DB lock so the scraper isn't blocked
-    for t, (h, data) in exports.items():
+    for t, (h, n, data) in exports.items():
         store.put(f"{prefix}/db/{t}.parquet", data)
         m["tables"][t] = h
+        rows[t] = n
         uploaded.append((t, len(data)))
     if bodies is not None:
         store.put(f"{prefix}/db/{pf.incr_table}/part-{stamp}.parquet", bodies)
@@ -250,7 +252,7 @@ def push(store: Store | None = None, profile: str = "uk", prune_raw: bool = Fals
     raw_dir: Path = pf.raw_dir
     since = m.get("raw_watermark", 0.0)
     files = sorted((p for p in raw_dir.rglob("*.gz")
-                    if p.stat().st_mtime > since and p.relative_to(raw_dir).parts[0] not in pf.raw_exclude),
+                    if p.stat().st_mtime > since),
                    key=lambda p: p.stat().st_mtime) if raw_dir.exists() else []
     part, size, n, pruned = [], 0, 0, 0
     for i, f in enumerate(files):
@@ -293,7 +295,9 @@ def push_bulk(store: Store | None = None, profile: str = "us") -> None:
     nothing scraped exists only on one machine. Each version is kept under its own date; already
     uploaded chunks are skipped (resumable). Restore with pull_bulk."""
     pf = get_profile(profile)
-    bulk_dir = pf.raw_dir.parent / "bulk"
+    if pf.bulk_dir is None:
+        raise SystemExit(f"profile {pf.name} has no bulk files")
+    bulk_dir = pf.bulk_dir
     store = store or get_store()
     m = _load_manifest(store, pf.prefix, pf.manifest)
     done = m.setdefault("bulk", {})
@@ -329,7 +333,7 @@ def pull_bulk(store: Store | None = None, profile: str = "us") -> None:
     for ver, rec in sorted(m.get("bulk", {}).items()):
         if rec.get("complete"):
             latest[rec["name"]] = (ver, rec)
-    out_dir = pf.raw_dir.parent / "bulk"
+    out_dir = pf.bulk_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     for name, (ver, rec) in latest.items():
         tmp, sha = out_dir / (name + ".partial"), hashlib.sha256()
@@ -342,51 +346,6 @@ def pull_bulk(store: Store | None = None, profile: str = "us") -> None:
             raise RuntimeError(f"checksum mismatch restoring {name}")
         tmp.rename(out_dir / name)
         log.info("[%s] restored bulk %s", pf.name, name)
-
-
-def _free_gb(path: Path) -> float:
-    import shutil
-    return round(shutil.disk_usage(path).free / 1e9, 2)
-
-
-def _status(cfg) -> dict:
-    """Small progress report so the run can be monitored remotely (read with `status --remote`)."""
-    import platform
-    import subprocess
-    log_dir: Path = cfg["paths"]["log_dir"]
-
-    def tail(name, n=15):
-        f = log_dir / name
-        return f.read_text(errors="replace").splitlines()[-n:] if f.exists() else []
-
-    with session(read_only=True) as con:
-        prog = con.execute("""SELECT split_part(key, ':', 1) AS kind, status, count(*) AS n, max(key) AS last_key
-                              FROM scrape_progress GROUP BY ALL ORDER BY ALL""").df().to_dict("records")
-        bodies = con.execute("SELECT status, count(*) AS n FROM ann_bodies GROUP BY 1").df().to_dict("records")
-    procs = subprocess.run(["pgrep", "-fa", "run_full|backup_loop|ingest\\."], capture_output=True, text=True).stdout
-    return {"host": platform.node(), "at": datetime.now().isoformat(),
-            "uptime": Path("/proc/uptime").read_text().split()[0] if Path("/proc/uptime").exists() else None,
-            "disk_free_gb": _free_gb(cfg["paths"]["data_dir"]),
-            "progress": prog, "bodies": bodies, "processes": procs.splitlines()[:10],
-            "announcements_log": tail("announcements.log"), "full_run": tail("full_run.out", 8),
-            "http_errors": [l for l in tail("http.log", 200) if "WARNING" in l or "ERROR" in l][-10:]}
-
-
-def _us_status() -> dict:
-    import platform
-    from ingest.us.common import us_cfg
-    u = us_cfg()
-    log_dir: Path = load_config()["paths"]["log_dir"]
-    f = log_dir / "us.log"
-    with session(read_only=True, db=u["db"], schema="") as con:
-        prog = con.execute("SELECT key, status, n FROM us_progress ORDER BY key").df().to_dict("records")
-        docs = con.execute("""SELECT item_group, status, count(*) n FROM us_filing_docs GROUP BY ALL
-                              ORDER BY ALL""").df().to_dict("records")
-    return {"host": platform.node(), "at": datetime.now().isoformat(),
-            "uptime": Path("/proc/uptime").read_text().split()[0] if Path("/proc/uptime").exists() else None,
-            "disk_free_gb": _free_gb(u["db"].parent),
-            "progress": prog[-8:], "docs": docs,
-            "us_log": f.read_text(errors="replace").splitlines()[-15:] if f.exists() else []}
 
 
 def pull(store: Store | None = None, force: bool = False, profile: str = "uk", skip_raw: bool = False) -> None:
@@ -413,7 +372,7 @@ def pull(store: Store | None = None, force: bool = False, profile: str = "uk", s
             f = Path(d) / f"b{i}.parquet"
             f.write_bytes(store.get(name))
         if parts:
-            key = "ann_id" if pf.incr_table == "ann_bodies" else "accession"
+            key = pf.incr_key
             con.execute(f"""INSERT INTO {pf.incr_table} SELECT * EXCLUDE (rn) FROM (
                 SELECT *, row_number() OVER (PARTITION BY {key} ORDER BY fetched_at DESC) rn
                 FROM read_parquet('{d}/b*.parquet')) WHERE rn = 1""")

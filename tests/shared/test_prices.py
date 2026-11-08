@@ -1,6 +1,6 @@
 import pandas as pd
 
-from ingest.quality import flag_prices
+from ingest.shared.prices import flag_prices
 
 
 def _df(closes, vols=None, opens=None):

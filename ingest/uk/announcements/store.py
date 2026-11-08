@@ -6,8 +6,8 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from ingest.announcements.base import IndexRow
-from ingest.announcements.rules import admin_rule, headline_category, is_replacement
+from ingest.uk.announcements.base import IndexRow
+from ingest.uk.announcements.rules import admin_rule, headline_category, is_replacement
 
 UK = ZoneInfo("Europe/London")
 UTC = ZoneInfo("UTC")

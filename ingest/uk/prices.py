@@ -1,7 +1,7 @@
 """Daily OHLCV from Yahoo (yfinance) for every universe ticker + benchmark indices.
 
-    uv run python -m ingest.prices download [--limit N] [--refresh] [--tickers DSG,TSCO]
-    uv run python -m ingest.prices report
+    uv run python -m ingest.uk.prices download [--limit N] [--refresh] [--tickers DSG,TSCO]
+    uv run python -m ingest.uk.prices report
 
 * Split-adjusted OHLC (auto_adjust=False -> OHLC adjusted for splits only; adj_close also
   for dividends). Volume is split-adjusted too, so close*volume = £ turnover is consistent.
@@ -18,27 +18,13 @@ import pandas as pd
 import yfinance as yf
 
 from core.config import date_range, load_config
-from core.db import connect, session
 from core.log import get_logger
-from ingest.quality import flag_prices
+from ingest.shared.prices import tidy_yahoo
+from ingest.uk.common import connect, session, uk_cfg
 
 log = get_logger("prices")
 
 COLS = ["tidm", "date", "open", "high", "low", "close", "adj_close", "volume", "is_stale", "is_suspect"]
-
-
-def _tidy(raw: pd.DataFrame, tidm: str, glitch_ratio: float) -> pd.DataFrame:
-    df = raw.rename(columns={"Open": "open", "High": "high", "Low": "low", "Close": "close",
-                             "Adj Close": "adj_close", "Volume": "volume"})
-    df = df.reset_index().rename(columns={"Date": "date"})
-    df["date"] = pd.to_datetime(df["date"]).dt.tz_localize(None).dt.date
-    df = df.dropna(subset=["open", "high", "low", "close"], how="all")
-    df = df.dropna(subset=["close"])
-    if df.empty:
-        return df
-    df["tidm"] = tidm
-    df = flag_prices(df, glitch_ratio)
-    return df[COLS].drop_duplicates(["tidm", "date"])
 
 
 def _download_batch(symbols: list[str], start, end, retries: int) -> pd.DataFrame | None:
@@ -55,7 +41,7 @@ def _download_batch(symbols: list[str], start, end, retries: int) -> pd.DataFram
 
 def download(limit: int | None = None, refresh: bool = False, tickers: list[str] | None = None) -> None:
     cfg = load_config()
-    pc = cfg["prices"]
+    pc = uk_cfg()["prices"]
     start, end = date_range(cfg)
     with session() as con:
         u = con.execute("SELECT tidm, yahoo_ticker FROM universe ORDER BY tidm").df()
@@ -83,7 +69,7 @@ def download(limit: int | None = None, refresh: bool = False, tickers: list[str]
                 if raw is None:
                     raise RuntimeError("batch download failed")
                 sub = raw[sym] if isinstance(raw.columns, pd.MultiIndex) else raw
-                df = _tidy(sub, tidm, pc["unit_glitch_ratio"])
+                df = tidy_yahoo(sub, tidm, pc["unit_glitch_ratio"])
             except Exception as e:
                 logs.append((tidm, sym, now, "error", 0, None, None, str(e)[:500]))
                 continue

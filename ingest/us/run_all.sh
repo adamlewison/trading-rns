@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# US document download (resumable). Index/submissions/facts/prices are restored from the B2 backup;
-# refresh them separately if needed. Exit code 3 from a step = SEC refusing us: stop, don't hammer.
+# US document download, every step in order (resumable: just rerun after any interruption).
+# Mirrors ingest/uk/run_all.sh. Index / submissions / facts / prices are restored from the B2
+# backup; refresh them separately if needed. Exit code 3 = SEC refusing us: stop, don't hammer;
+# exit code 4 = low disk.
 set -u
 cd "$(dirname "$0")/../.."
 R="uv run python -W ignore -m"

@@ -1,7 +1,16 @@
 from datetime import date, datetime
 
-from ingest.us.parse import (accession_from_path, classify_session, et_to_utc, html_to_text,
-                             parse_form_idx, parse_index_headers, pick_exhibit, quarters, yahoo_symbol)
+from ingest.us.parse import (
+    accession_from_path,
+    classify_session,
+    et_to_utc,
+    html_to_text,
+    parse_form_idx,
+    parse_index_headers,
+    pick_exhibit,
+    quarters,
+    yahoo_symbol,
+)
 
 FORM_IDX = """Description:           Master Index of EDGAR Dissemination Feed by Form Type
 Last Data Received:    March 31, 2012

@@ -33,18 +33,16 @@ class Blocked(Exception):
 
 
 class PoliteClient:
-    def __init__(self, cache_subdir: str = "html", min_interval_s: float | None = None,
-                 user_agent: str | None = None, cache_root: Path | None = None,
-                 extra_headers: dict | None = None):
-        cfg = load_config()
-        s = cfg["scrape"]
-        self.min_interval = s["min_interval_s"] if min_interval_s is None else min_interval_s
+    def __init__(self, cache_root: Path, user_agent: str, min_interval_s: float = 1.0,
+                 cache_subdir: str = "html", extra_headers: dict | None = None):
+        s = load_config()["http"]
+        self.min_interval = min_interval_s
         self.max_retries = s["max_retries"]
         self.backoff = s["backoff_base_s"]
         self.respect_robots = s["respect_robots"]
-        self.cache_dir: Path = (cache_root or cfg["paths"]["raw_dir"]) / cache_subdir
+        self.cache_dir: Path = Path(cache_root) / cache_subdir
         self.client = httpx.Client(
-            headers={"User-Agent": user_agent or s["user_agent"], **(extra_headers or {})},
+            headers={"User-Agent": user_agent, **(extra_headers or {})},
             timeout=s["timeout_s"],
             follow_redirects=True,
         )

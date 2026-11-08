@@ -1,53 +1,93 @@
 # Central configuration. Secrets live in .env (see .env.example), never here.
+# Shared settings first, then one section per market (uk, us) with the same shape:
+#   db / raw_dir / backup_prefix, then that market's sources.
 
 paths:
   data_dir: data
-  db: data/rns.duckdb
-  raw_dir: data/raw            # cached downloads (HTML, xlsx, zip) — never re-downloaded
   log_dir: data/logs
 
 dates:
   start: 2012-01-01
   end: null                    # null = today
 
-universe:
-  # LSE public reports (docs.londonstockexchange.com/reports/...)
-  instrument_list_url: https://docs.londonstockexchange.com/reports/instruments/Instrument%20list.xlsx
-  issuer_latest_index: https://docs.londonstockexchange.com/reports/issuers/latest.json
-  issuer_historic_index: https://docs.londonstockexchange.com/reports/issuers/historic.json
-  issuer_archive_min_year: 2011   # monthly snapshots used for point-in-time market & market cap
-  include_aim: true
-  include_smallcap_proxy: true    # Main Market commercial equities outside the FTSE 350 (see ASSUMPTIONS.md)
-  # LSE "Market Sector Code" values that mark FTSE 100 / FTSE 250 members in the instrument list
-  ftse100_sector_codes: [FE10, FS10]
-  ftse250_sector_codes: [F25T, F25F, F25S]
-
-prices:
-  yahoo_suffix: .L
-  batch_size: 40
-  pause_between_batches_s: 3.0
-  max_retries: 3
-  refresh_after_days: 3           # skip tickers downloaded more recently than this (resumable)
-  index_tickers:
-    aim_all_share: ^FTAI
-    ftse_smallcap: ^FTSC
-    ftse_all_share: ^FTAS
-  # a day-to-day move this large (either direction) that reverses next day is treated as a
-  # Yahoo GBP/GBp unit glitch and flagged, not silently fixed
-  unit_glitch_ratio: 30
-
-scrape:
-  source: investegate
-  user_agent: "trading-rns-research/0.1 (personal non-commercial research; python-httpx)"
-  min_interval_s: 0.5             # 2 req/s (user decision 2026-11-07; robots.txt sets no crawl-delay)
+http:                          # defaults for core.http.PoliteClient (each source sets its own rate + UA)
   timeout_s: 30
   max_retries: 5
   backoff_base_s: 4.0
   respect_robots: true
-  index_mode: company             # company | daily  (see README)
-  # only fetch full body text for announcements that are (a) non-admin and (b) for universe tickers
-  bodies_only_for_universe: true
-  bodies_only_pre_open: true      # hypothesis is about pre-open news (user decision 2026-11-07)
+
+backup:
+  store: b2                       # b2 | local
+  bucket: trading-rns-backup-c0772b   # private; lifecycle keeps only the latest version of overwritten files
+  local_dir: null                 # for store: local
+  interval_min: 30
+
+# ---------- UK: AIM + FTSE SmallCap proxy, RNS announcements ----------
+uk:
+  db: data/uk.duckdb
+  raw_dir: data/raw/uk            # cached downloads (HTML, xlsx): never re-downloaded
+  backup_prefix: trading-rns/v1   # B2 folder (the original location, kept so old backups stay valid)
+  user_agent: "trading-rns-research/0.1 (personal non-commercial research; python-httpx)"
+  universe:
+    # LSE public reports (docs.londonstockexchange.com/reports/...)
+    instrument_list_url: https://docs.londonstockexchange.com/reports/instruments/Instrument%20list.xlsx
+    issuer_latest_index: https://docs.londonstockexchange.com/reports/issuers/latest.json
+    issuer_historic_index: https://docs.londonstockexchange.com/reports/issuers/historic.json
+    issuer_archive_min_year: 2011   # monthly snapshots used for point-in-time market & market cap
+    include_aim: true
+    include_smallcap_proxy: true    # Main Market commercial equities outside the FTSE 350 (see ASSUMPTIONS.md)
+    # LSE "Market Sector Code" values that mark FTSE 100 / FTSE 250 members in the instrument list
+    ftse100_sector_codes: [FE10, FS10]
+    ftse250_sector_codes: [F25T, F25F, F25S]
+  prices:
+    yahoo_suffix: .L
+    batch_size: 40
+    pause_between_batches_s: 3.0
+    max_retries: 3
+    refresh_after_days: 3           # skip tickers downloaded more recently than this (resumable)
+    index_tickers:
+      aim_all_share: ^FTAI
+      ftse_smallcap: ^FTSC
+      ftse_all_share: ^FTAS
+    # a day-to-day move this large (either direction) that reverses next day is treated as a
+    # Yahoo GBP/GBp unit glitch and flagged, not silently fixed
+    unit_glitch_ratio: 30
+  announcements:
+    source: investegate
+    min_interval_s: 0.5             # 2 req/s (user decision 2026-11-07; robots.txt sets no crawl-delay)
+    index_mode: company             # company | daily  (see README)
+    # only fetch full body text for announcements that are (a) non-admin and (b) for universe tickers
+    bodies_only_for_universe: true
+    bodies_only_pre_open: true      # hypothesis is about pre-open news (user decision 2026-11-07)
+
+# ---------- US: SEC EDGAR 8-K filings (data collection only) ----------
+us:
+  db: data/us.duckdb
+  raw_dir: data/raw/us
+  backup_prefix: trading-rns/us/v1
+  start_year: 2012
+  # SEC fair-access policy: max 10 req/s. We stay at ~5.
+  # User-Agent comes from SEC_USER_AGENT in .env ("Name email"); required, never hard-coded.
+  min_interval_s: 0.2
+  forms: ["8-K", "8-K/A"]
+  earnings_items: ["2.02"]
+  news_items: ["1.01", "2.01", "7.01", "8.01"]
+  # companyfacts concepts extracted into us_facts (the whole zip is kept for anything else)
+  fact_concepts:
+    us-gaap: [Revenues, RevenueFromContractWithCustomerExcludingAssessedTax, SalesRevenueNet,
+              NetIncomeLoss, OperatingIncomeLoss, EarningsPerShareBasic, EarningsPerShareDiluted,
+              WeightedAverageNumberOfSharesOutstandingBasic, WeightedAverageNumberOfDilutedSharesOutstanding,
+              CommonStockSharesOutstanding, Assets, CashAndCashEquivalentsAtCarryingValue,
+              LongTermDebt, StockholdersEquity]
+    dei: [EntityCommonStockSharesOutstanding, EntityPublicFloat]
+  price_exchanges: [NYSE, Nasdaq]       # OTC and others skipped
+  benchmarks: [SPY, IWM]
+  disk_warn_gb: 20
+  # cached SEC pages are uploaded to B2 and deleted locally by the US backup loop
+  # (`core.backup push --profile us --prune-raw`), so the droplet only keeps the extracted text
+  prune_raw: true
+  min_free_gb: 3                        # docs download stops cleanly below this much free disk
+  unit_glitch_ratio: 30
 
 # ---------- later phases (placeholders, used from Phase 2 on) ----------
 llm:
@@ -77,37 +117,3 @@ liquidity:
 
 backtest:
   holdout_months: 12
-
-backup:
-  store: b2                       # b2 | local
-  bucket: trading-rns-backup-c0772b   # private; lifecycle keeps only the latest version
-  prefix: trading-rns/v1
-  local_dir: null                 # for store: local
-  interval_min: 30
-
-# ---------- US (SEC EDGAR) data collection — separate DB + raw cache ----------
-us:
-  db: data/us.duckdb
-  raw_dir: data/raw/us
-  start_year: 2012
-  # SEC fair-access policy: max 10 req/s. We stay at ~5.
-  min_interval_s: 0.2
-  # User-Agent comes from SEC_USER_AGENT in .env ("Name email"); required, never hard-coded.
-  forms: ["8-K", "8-K/A"]
-  earnings_items: ["2.02"]
-  news_items: ["1.01", "2.01", "7.01", "8.01"]
-  # companyfacts concepts extracted into us_facts (the whole zip is kept for anything else)
-  fact_concepts:
-    us-gaap: [Revenues, RevenueFromContractWithCustomerExcludingAssessedTax, SalesRevenueNet,
-              NetIncomeLoss, OperatingIncomeLoss, EarningsPerShareBasic, EarningsPerShareDiluted,
-              WeightedAverageNumberOfSharesOutstandingBasic, WeightedAverageNumberOfDilutedSharesOutstanding,
-              CommonStockSharesOutstanding, Assets, CashAndCashEquivalentsAtCarryingValue,
-              LongTermDebt, StockholdersEquity]
-    dei: [EntityCommonStockSharesOutstanding, EntityPublicFloat]
-  price_exchanges: [NYSE, Nasdaq]       # OTC and others skipped
-  benchmarks: [SPY, IWM]
-  disk_warn_gb: 20
-  # cached SEC pages are uploaded to B2 and deleted locally by the US backup loop
-  # (`core.backup push --profile us --prune-raw`), so the droplet only keeps the extracted text
-  prune_raw: true
-  min_free_gb: 3                        # docs download stops cleanly below this much free disk

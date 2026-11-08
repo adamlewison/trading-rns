@@ -3,13 +3,15 @@
 Where something was uncertain, I picked the conservative option. Anything that could make
 results look better than they really are is flagged with ⚠️.
 
-## Universe
+## UK
+
+### Universe
 
 - **⚠️ Survivorship bias (big).** The LSE instrument list (the only free source with TIDMs) has
   *current* companies only. LSE monthly issuer snapshots show roughly 1,100 AIM companies in 2012
   vs about 600 today, so about half of the 2012 AIM universe has since delisted (failures,
   takeovers, moves). What we do about it:
-  - The announcement index (Investegate) covers delisted companies, and `ingest.universe add-delisted`
+  - The announcement index (Investegate) covers delisted companies, and `ingest.uk.universe add-delisted`
     adds a TIDM when its company name matches an AIM (or non-FTSE-350 Main Market) company in a
     historic LSE snapshot. This only finds delisted names that show up in the announcement index
     we scraped. Company-mode indexing never finds them; daily mode does.
@@ -34,7 +36,7 @@ results look better than they really are is flagged with ⚠️.
   reuse). Phase 3 must drop price rows that fall outside a company's listing window and must check
   that announcement and price series belong to the same company.
 
-## Prices (Yahoo via yfinance)
+### Prices (Yahoo via yfinance)
 
 - OHLC are **split-adjusted only** (`auto_adjust=False`). `adj_close` is also dividend-adjusted.
   Volume is split-adjusted, so `close × volume` gives a consistent £ turnover.
@@ -58,7 +60,7 @@ results look better than they really are is flagged with ⚠️.
 - Prices are in the trading currency (mostly GBX = pence; a few USD/EUR AIM lines). The currency
   is stored in `universe.currency`.
 
-## Announcements (Investegate)
+### Announcements (Investegate)
 
 - **Source choice and terms.** robots.txt allows the pages we use (`/company/`, `/today-announcements/`,
   `/announcement/`). The Terms of Use allow personal reference by private investors only, with no
@@ -95,7 +97,23 @@ results look better than they really are is flagged with ⚠️.
 - Replacement/amended announcements are kept and flagged (`is_replacement`). Phase 3 should not
   treat a replacement as new information.
 
-## US data (SEC EDGAR)
+### UK trading service (SETS / SETSqx)
+
+- Trading service = (Market Segment Code, Market Sector Code) from the LSE instrument list, mapped
+  through the "Sector Breakdown" sheet of LSE's Business Parameters workbook. Both are official LSE
+  files. **History** only starts from our first download, because LSE publishes the instrument
+  list as "latest" only. Each later monthly `ingest.uk.universe build` adds a snapshot.
+- **⚠️ Today's service applied to the past is an approximation:** stocks move between SETS and
+  SETSqx (LSE reviews liquidity periodically). For backtest filtering, a stock's current service is
+  a proxy for its historical one.
+- LSE's weekly "List of SETS/SETSqx securities" and "Registered Market Makers by Security" files
+  are only linked from a JavaScript page whose API refuses scripted access (HTTP 403), so we don't
+  scrape them. The market-maker file is downloaded by hand and imported with
+  `ingest.uk.trading_service import-mm`.
+
+## US
+
+### SEC EDGAR filings
 
 - **Acceptance time:** we use the **filing index page** (`<accession>-index.htm`, "Accepted",
   Eastern time). The `acceptanceDateTime` in SEC's submissions JSON is labelled UTC ("…Z"), but for
@@ -119,17 +137,3 @@ results look better than they really are is flagged with ⚠️.
 - **Company facts:** a fixed list of XBRL concepts (config `us.fact_concepts`) is extracted, and
   the whole `companyfacts.zip` is kept so other concepts can be added later. `filed` is the
   point-in-time date to use. Facts come from 10-K/10-Q filings, so they lag 8-K earnings releases.
-
-## UK trading service (addition A)
-
-- Trading service = (Market Segment Code, Market Sector Code) from the LSE instrument list, mapped
-  through the "Sector Breakdown" sheet of LSE's Business Parameters workbook. Both are official LSE
-  files. **History** only starts from our first download, because LSE publishes the instrument
-  list as "latest" only. Each later monthly `ingest.universe build` adds a snapshot.
-- **⚠️ Today's service applied to the past is an approximation:** stocks move between SETS and
-  SETSqx (LSE reviews liquidity periodically). For backtest filtering, a stock's current service is
-  a proxy for its historical one.
-- LSE's weekly "List of SETS/SETSqx securities" and "Registered Market Makers by Security" files
-  are only linked from a JavaScript page whose API refuses scripted access (HTTP 403), so we don't
-  scrape them. The market-maker file is downloaded by hand and imported with
-  `ingest.uk_trading_service import-mm`.

@@ -1,7 +1,7 @@
 from datetime import datetime
 
-from ingest.announcements.base import IndexRow
-from ingest.announcements.store import is_pre_open, to_records, uk_to_utc
+from ingest.uk.announcements.base import IndexRow
+from ingest.uk.announcements.store import is_pre_open, to_records, uk_to_utc
 
 
 def test_uk_to_utc_handles_dst():

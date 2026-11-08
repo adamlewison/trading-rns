@@ -2,9 +2,9 @@
 
 Run AFTER the UK scrape has finished (it writes to the UK DB).
 
-    uv run python -m ingest.uk_trading_service build            # service map + per-ticker service
-    uv run python -m ingest.uk_trading_service import-mm FILE   # "Registered Market Makers by Security"
-    uv run python -m ingest.uk_trading_service report
+    uv run python -m ingest.uk.trading_service build            # service map + per-ticker service
+    uv run python -m ingest.uk.trading_service import-mm FILE   # "Registered Market Makers by Security"
+    uv run python -m ingest.uk.trading_service report
 
 Sources (official, LSE):
   * Instrument list (docs.londonstockexchange.com/reports/instruments): each line's Market Segment
@@ -25,29 +25,14 @@ from pathlib import Path
 
 import pandas as pd
 
-from core.db import session
-from core.http import PoliteClient
 from core.log import get_logger
+from ingest.uk.common import client as uk_client
+from ingest.uk.common import session
 
 log = get_logger("uk_trading_service")
 
 BP_URL = ("https://www.londonstockexchange.com/content/dam/lse/en_us/documents/technical-library/"
           "millennium-exchange-and-tradecho-business-parameters.xlsx")
-
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS lse_service_map (
-    version_date DATE, trading_service VARCHAR, segment_code VARCHAR, segment_name VARCHAR,
-    sector_code VARCHAR, sector_name VARCHAR
-);
-CREATE TABLE IF NOT EXISTS uk_trading_service (       -- one row per ticker per instrument-list snapshot
-    snapshot_date DATE, tidm VARCHAR, segment_code VARCHAR, sector_code VARCHAR,
-    trading_service VARCHAR, map_version DATE,
-    PRIMARY KEY (snapshot_date, tidm)
-);
-CREATE TABLE IF NOT EXISTS uk_market_makers (         -- long format: one row per (security, market maker)
-    as_of DATE, tidm VARCHAR, isin VARCHAR, market_maker VARCHAR, source_file VARCHAR
-);
-"""
 
 
 def parse_service_map(xlsx: bytes) -> pd.DataFrame:
@@ -66,14 +51,13 @@ def parse_service_map(xlsx: bytes) -> pd.DataFrame:
 
 
 def build() -> None:
-    client = PoliteClient(cache_subdir="lse", min_interval_s=1.0)
+    client = uk_client("lse", min_interval_s=1.0)
     status, body = client.get(BP_URL, use_cache=False)
     if status != 200:
         raise SystemExit(f"business parameters download failed: HTTP {status}")
     m = parse_service_map(body)
     v = date.today()
     with session() as con:
-        con.execute(SCHEMA)
         con.execute("DELETE FROM lse_service_map WHERE version_date = ?", [v])
         m.insert(0, "version_date", v)
         con.register("m", m)
@@ -124,7 +108,6 @@ def import_mm(path: str, as_of: str | None) -> None:
     df.insert(0, "as_of", date.fromisoformat(as_of) if as_of else date.today())
     df["source_file"] = p.name
     with session() as con:
-        con.execute(SCHEMA)
         con.execute("DELETE FROM uk_market_makers WHERE as_of = ?", [df["as_of"].iloc[0]])
         con.register("df", df)
         con.execute("INSERT INTO uk_market_makers SELECT as_of, tidm, isin, market_maker, source_file FROM df")
@@ -136,7 +119,7 @@ def import_mm(path: str, as_of: str | None) -> None:
 
 
 def report() -> None:
-    with session(read_only=True) as con:
+    with session() as con:   # writable, so the tables exist even before the first build
         print(con.execute("""
             WITH s AS (SELECT * FROM uk_trading_service WHERE snapshot_date = (SELECT max(snapshot_date) FROM uk_trading_service)),
                  mm AS (SELECT tidm, count(DISTINCT market_maker) n_mm FROM uk_market_makers

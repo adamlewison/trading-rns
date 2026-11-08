@@ -16,7 +16,8 @@ from datetime import date, datetime
 from selectolax.lexbor import LexborHTMLParser as HTMLParser
 
 from core.http import PoliteClient
-from ingest.announcements.base import IndexRow, ListingPage
+from ingest.uk.announcements.base import IndexRow, ListingPage
+from ingest.uk.common import client as uk_client
 
 BASE = "https://www.investegate.co.uk"
 _ID_RE = re.compile(r"/announcement/([a-z0-9]+)/[^/]+/[^/]+/(\d+)")
@@ -135,7 +136,7 @@ class Investegate:
     name = "investegate"
 
     def __init__(self, client: PoliteClient | None = None):
-        self.client = client or PoliteClient(cache_subdir="html")
+        self.client = client or uk_client("html")
         self._company_names: dict[str, str | None] = {}
 
     def _get(self, url: str, use_cache: bool = True) -> tuple[int, str]:

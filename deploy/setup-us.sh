@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# One-time setup of the US (SEC EDGAR) download on the droplet. Run as root in Termius:
-#     bash /opt/trading-rns/deploy/setup-us.sh        (after `git -C /opt/trading-rns pull`)
+# One-time setup of the US (SEC EDGAR) download on the droplet. Mirrors deploy/setup-uk.sh. Run as root:
+#     bash /opt/trading-rns/deploy/setup-us.sh
+# or, without updating the UK checkout (e.g. while the UK scrape is running):
+#     git -C /opt/trading-rns fetch -q && git -C /opt/trading-rns show origin/claude/uk-smallcap-rns-drift-i83n19:deploy/setup-us.sh > /root/setup-us.sh && bash /root/setup-us.sh
 # Uses a SEPARATE checkout + data folder so it never touches the running UK scrape or its DB.
 # If a DigitalOcean volume is attached it is formatted (only if blank) and mounted, and the US
 # data lives there.
@@ -55,7 +57,7 @@ After=network-online.target
 [Service]
 WorkingDirectory=$DIR
 Environment=PATH=/root/.local/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=/bin/bash -c 'while true; do uv run python -W ignore -m core.backup push --profile us --prune-raw >> data/logs/us_backup.out 2>&1; sleep 1800; done'
+ExecStart=/bin/bash -c 'exec deploy/backup-loop.sh us --prune-raw >> data/logs/us_backup.out 2>&1'
 Restart=always
 RestartSec=60
 [Install]

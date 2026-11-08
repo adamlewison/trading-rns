@@ -1,6 +1,11 @@
 import pytest
 
-from ingest.announcements.rules import admin_rule, clean_headline, headline_category, is_replacement
+from ingest.uk.announcements.rules import (
+    admin_rule,
+    clean_headline,
+    headline_category,
+    is_replacement,
+)
 
 ADMIN = [
     "Total Voting Rights", "TVR", "Replacement - Total Voting Rights", "Holding(s) in Company",

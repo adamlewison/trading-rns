@@ -6,9 +6,9 @@ Sources (LSE public reports, docs.londonstockexchange.com):
 Delisted companies are added later from the announcement index (TIDMs seen in RNS listings
 that are not in today's instrument list), matched by name to the historic snapshots.
 
-    uv run python -m ingest.universe build
-    uv run python -m ingest.universe add-delisted     # after announcements index exists
-    uv run python -m ingest.universe report
+    uv run python -m ingest.uk.universe build
+    uv run python -m ingest.uk.universe add-delisted     # after announcements index exists
+    uv run python -m ingest.uk.universe report
 """
 from __future__ import annotations
 
@@ -21,11 +21,11 @@ from datetime import date, datetime
 
 import pandas as pd
 
-from core.config import load_config
-from core.db import connect
 from core.http import PoliteClient
 from core.log import get_logger
-from ingest.names import normalise_name, tidm_to_yahoo
+from ingest.uk.common import client as uk_client
+from ingest.uk.common import connect, uk_cfg
+from ingest.uk.names import normalise_name, tidm_to_yahoo
 
 log = get_logger("universe")
 
@@ -65,7 +65,7 @@ def _as_at(raw: pd.DataFrame) -> date | None:
 
 # ---------------------------------------------------------------- instrument list
 def load_instruments(client: PoliteClient) -> pd.DataFrame:
-    cfg = load_config()["universe"]
+    cfg = uk_cfg()["universe"]
     # "latest" changes monthly: bypass cache, but the response is also cached for audit.
     body = _download(client, cfg["instrument_list_url"], cache=False)
     raw = pd.read_excel(io.BytesIO(body), sheet_name="1.1 Shares", header=None, engine="calamine")
@@ -157,7 +157,7 @@ def _parse_issuer_workbook(body: bytes, source_file: str, file_year: int | None 
 
 
 def load_issuer_snapshots(client: PoliteClient) -> pd.DataFrame:
-    cfg = load_config()["universe"]
+    cfg = uk_cfg()["universe"]
     min_year = cfg["issuer_archive_min_year"]
     entries = []
     for idx_url in (cfg["issuer_historic_index"], cfg["issuer_latest_index"]):
@@ -188,7 +188,7 @@ def load_issuer_snapshots(client: PoliteClient) -> pd.DataFrame:
 # ---------------------------------------------------------------- universe
 def classify_instruments(inst: pd.DataFrame) -> pd.DataFrame:
     """Return rows that belong in the universe with grp = aim | smallcap_proxy."""
-    cfg = load_config()["universe"]
+    cfg = uk_cfg()["universe"]
     ftse350 = set(cfg["ftse100_sector_codes"]) | set(cfg["ftse250_sector_codes"])
     is_aim = inst["lse_market"].eq("AIM")
     is_main_small = (
@@ -203,7 +203,7 @@ def classify_instruments(inst: pd.DataFrame) -> pd.DataFrame:
 
 
 def build() -> None:
-    client = PoliteClient(cache_subdir="lse", min_interval_s=1.0)
+    client = uk_client("lse", min_interval_s=1.0)
     con = connect()
     inst = load_instruments(client)
     con.execute("DELETE FROM lse_instruments WHERE snapshot_date = ?", [inst["snapshot_date"].iloc[0]])
@@ -220,7 +220,7 @@ def build() -> None:
     log.info("issuer snapshots: %d rows, %d months", len(snaps), snaps["snapshot_date"].nunique())
 
     u = classify_instruments(inst)
-    sfx = load_config()["prices"]["yahoo_suffix"]
+    sfx = uk_cfg()["prices"]["yahoo_suffix"]
     rows = pd.DataFrame({
         "tidm": u["tidm"], "name": u["issuer_name"], "name_norm": u["issuer_name"].map(normalise_name),
         "isin": u["isin"], "currency": u["currency"], "market": u["market"], "grp": u["grp"],
@@ -248,7 +248,7 @@ def add_delisted() -> None:
     delisted/renamed companies. Keep them if their name matches an AIM company (or a Main
     Market company ranked outside the top 350 by market cap) in a historic monthly snapshot."""
     con = connect()
-    sfx = load_config()["prices"]["yahoo_suffix"]
+    sfx = uk_cfg()["prices"]["yahoo_suffix"]
     cand = con.execute("""
         SELECT tidm, any_value(company) AS company,
                min(published_uk)::DATE AS first_seen, max(published_uk)::DATE AS last_seen

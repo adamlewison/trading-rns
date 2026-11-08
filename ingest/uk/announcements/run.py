@@ -1,16 +1,16 @@
 """Announcement ingest CLI.
 
     # 1. discover announcements (listing pages only; cheap)
-    uv run python -m ingest.announcements.run index --mode company [--tickers DSG,ABC] [--limit 20] [--sample 20]
-    uv run python -m ingest.announcements.run index --mode daily --start 2015-01-01 --end 2015-01-31
+    uv run python -m ingest.uk.announcements.run index --mode company [--tickers DSG,ABC] [--limit 20] [--sample 20]
+    uv run python -m ingest.uk.announcements.run index --mode daily --start 2015-01-01 --end 2015-01-31
     # 2. fetch full text for non-admin announcements of universe companies
-    uv run python -m ingest.announcements.run bodies [--limit 200] [--random]
+    uv run python -m ingest.uk.announcements.run bodies [--limit 200] [--random]
     # 3. materialise announcements / announcements_admin tables, then report
-    uv run python -m ingest.announcements.run build
-    uv run python -m ingest.announcements.run report
+    uv run python -m ingest.uk.announcements.run build
+    uv run python -m ingest.uk.announcements.run report
 
 Everything is resumable: listing progress is in scrape_progress, bodies in ann_bodies, raw HTML in
-data/raw/html (never re-downloaded).
+data/raw/uk/html (never re-downloaded).
 """
 from __future__ import annotations
 
@@ -21,12 +21,12 @@ from datetime import date, datetime, timedelta
 import pandas as pd
 
 from core.config import date_range, load_config
-from core.db import connect, session
 from core.http import Blocked
 from core.log import get_logger
-from ingest.announcements.base import iter_company, iter_day
-from ingest.announcements.investegate import Investegate
-from ingest.announcements.store import insert_index
+from ingest.uk.announcements.base import iter_company, iter_day
+from ingest.uk.announcements.investegate import Investegate
+from ingest.uk.announcements.store import insert_index
+from ingest.uk.common import connect, session, uk_cfg
 
 log = get_logger("announcements")
 
@@ -35,7 +35,7 @@ MAX_CONSECUTIVE_BLOCKS = 3
 
 class Breaker:
     """Stop the whole job after N consecutive blocked units instead of hammering a site
-    that is refusing us. Exit code 3 = blocked (run_full.sh stops; the check-in reports it)."""
+    that is refusing us. Exit code 3 = blocked (ingest/uk/run_all.sh stops; the check-in reports it)."""
 
     def __init__(self, n: int = MAX_CONSECUTIVE_BLOCKS):
         self.n, self.count = n, 0
@@ -54,7 +54,7 @@ SOURCES = {"investegate": Investegate}
 
 
 def get_source():
-    return SOURCES[load_config()["scrape"]["source"]]()
+    return SOURCES[uk_cfg()["announcements"]["source"]]()
 
 
 def _progress(con, key: str, status: str, n: int, source: str) -> None:
@@ -137,7 +137,7 @@ def index_daily(start: date, end: date, refresh: bool) -> None:
 
 
 def fetch_bodies(limit: int | None, randomise: bool, tickers: list[str] | None = None) -> None:
-    cfg = load_config()["scrape"]
+    cfg = uk_cfg()["announcements"]
     src = get_source()
     where = ["NOT i.is_admin", "b.ann_id IS NULL"]
     if cfg["bodies_only_for_universe"]:
@@ -183,7 +183,11 @@ def fetch_bodies(limit: int | None, randomise: bool, tickers: list[str] | None =
 
 def reclassify() -> None:
     """Re-apply headline rules (admin filter / category) to everything already indexed."""
-    from ingest.announcements.rules import admin_rule, headline_category, is_replacement
+    from ingest.uk.announcements.rules import (
+        admin_rule,
+        headline_category,
+        is_replacement,
+    )
     with session() as con:
         df = con.execute("SELECT ann_id, headline FROM ann_index").df()
         df["admin_rule"] = df["headline"].map(admin_rule)
@@ -256,7 +260,7 @@ if __name__ == "__main__":
     ap.add_argument("--end", type=date.fromisoformat)
     a = ap.parse_args()
     if a.cmd == "index":
-        mode = a.mode or load_config()["scrape"]["index_mode"]
+        mode = a.mode or uk_cfg()["announcements"]["index_mode"]
         if mode == "company":
             index_company(a.tickers, a.limit, a.sample, a.refresh)
         else:
