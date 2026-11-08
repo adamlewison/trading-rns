@@ -1,0 +1,15 @@
+#cloud-config
+# No secrets in here: deploy/setup.sh asks for them interactively.
+package_update: true
+packages: [git, curl, ca-certificates]
+swap:
+  filename: /swapfile
+  size: 2G
+runcmd:
+  - [bash, -c, "curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/root/.local/bin sh"]
+  - [bash, -c, "timedatectl set-timezone Europe/London"]
+write_files:
+  - path: /root/setup-trading-rns.sh
+    permissions: "0700"
+    encoding: b64
+    content: __SETUP_B64__

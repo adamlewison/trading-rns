@@ -228,11 +228,37 @@ def push(store: Store | None = None) -> dict:
             _save_manifest(store, prefix, m)   # checkpoint after each raw part
             part, size, n = [], 0, n + 1
     _save_manifest(store, prefix, m)
+    try:
+        store.put(f"{prefix}/status/status.json", json.dumps(_status(cfg), indent=1, default=str).encode())
+    except Exception as e:  # status is best-effort, never fail a backup for it
+        log.warning("status upload failed: %s", e)
     for what, nbytes in uploaded:
         log.info("pushed %s: %.1f MB", what, nbytes / 1e6)
     if not uploaded:
         log.info("nothing new to push")
     return m
+
+
+def _status(cfg) -> dict:
+    """Small progress report so the run can be monitored remotely (read with `status --remote`)."""
+    import platform
+    import subprocess
+    log_dir: Path = cfg["paths"]["log_dir"]
+
+    def tail(name, n=15):
+        f = log_dir / name
+        return f.read_text(errors="replace").splitlines()[-n:] if f.exists() else []
+
+    with session(read_only=True) as con:
+        prog = con.execute("""SELECT split_part(key, ':', 1) AS kind, status, count(*) AS n, max(key) AS last_key
+                              FROM scrape_progress GROUP BY ALL ORDER BY ALL""").df().to_dict("records")
+        bodies = con.execute("SELECT status, count(*) AS n FROM ann_bodies GROUP BY 1").df().to_dict("records")
+    procs = subprocess.run(["pgrep", "-fa", "run_full|backup_loop|ingest\\."], capture_output=True, text=True).stdout
+    return {"host": platform.node(), "at": datetime.now().isoformat(),
+            "uptime": Path("/proc/uptime").read_text().split()[0] if Path("/proc/uptime").exists() else None,
+            "progress": prog, "bodies": bodies, "processes": procs.splitlines()[:10],
+            "announcements_log": tail("announcements.log"), "full_run": tail("full_run.out", 8),
+            "http_errors": [l for l in tail("http.log", 200) if "WARNING" in l or "ERROR" in l][-10:]}
 
 
 def pull(store: Store | None = None, force: bool = False) -> None:
@@ -273,9 +299,13 @@ def pull(store: Store | None = None, force: bool = False) -> None:
              len(parts), prefix)
 
 
-def status(store: Store | None = None) -> None:
+def status(store: Store | None = None, remote: bool = False) -> None:
     prefix = load_config().get("backup", {}).get("prefix", "trading-rns/v1")
     store = store or get_store()
+    if remote:
+        s = store.get(f"{prefix}/status/status.json")
+        print(json.dumps(json.loads(s), indent=1) if s else "no remote status yet")
+        return
     names = store.list(f"{prefix}/")
     print(f"{len(names)} objects under {prefix}/")
     m = store.get(f"{prefix}/manifest.json")
@@ -286,5 +316,11 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("cmd", choices=["push", "pull", "status"])
     ap.add_argument("--force", action="store_true")
+    ap.add_argument("--remote", action="store_true", help="status: show the status file the VPS uploads")
     a = ap.parse_args()
-    {"push": push, "status": status}.get(a.cmd, lambda: pull(force=a.force))()
+    if a.cmd == "push":
+        push()
+    elif a.cmd == "status":
+        status(remote=a.remote)
+    else:
+        pull(force=a.force)
