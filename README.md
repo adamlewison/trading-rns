@@ -149,7 +149,7 @@ nohup ingest/us/run_all.sh >> data/logs/us_run.out 2>&1 &
 Code: `filings.py` (index, tickers, submissions), `documents.py`, `facts.py`, `prices.py`,
 `report.py`, `parse.py` (pure parsing, tested); `run.py` is the command line.
 
-- **Rate:** about 5 requests per second to sec.gov (SEC's limit is 10), with an honest User-Agent,
+- **Rate:** at most 8 requests per second to sec.gov (SEC's limit is 10), with an honest User-Agent,
   every response cached, resumable, and a stop after 3 consecutive refusals.
 - **Timestamps:** the acceptance time comes from each filing's `-index.htm` page, which shows US
   Eastern time, and is converted to UTC with DST handled. `session` is `pre_market` (before 09:30 ET),

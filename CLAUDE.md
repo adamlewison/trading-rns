@@ -15,7 +15,7 @@ Research: do UK small-cap/AIM shares drift 1–3 days after pre-08:00 RNS news, 
 - Never buy anything. Ask before spending: no LLM call costing over £5 without confirmation (`llm.confirm_cost_above_gbp`), and no DigitalOcean upgrades.
 - **Scraping:**
   - Use an honest User-Agent and respect robots.txt.
-  - Rate limits: Investegate 2 req/s; SEC ~5 req/s (limit 10).
+  - Rate limits: Investegate 2 req/s; SEC max 8 req/s (limit 10).
   - On 403/429, back off, then stop. **Never evade a block**; report it to the user.
 - **Never delete scraped data.**
   - Everything goes to Backblaze B2.

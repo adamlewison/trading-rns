@@ -10,7 +10,7 @@
     uv run python -m ingest.us.run prices         # yfinance daily OHLCV, NYSE/Nasdaq + SPY/IWM
     uv run python -m ingest.us.run report
 
-Everything is resumable (progress table + raw cache in data/raw/us), rate-limited to ~5 req/s
+Everything is resumable (progress table + raw cache in data/raw/us), rate-limited to at most 8 req/s
 against SEC (limit: 10), and failures are logged, never fatal. Uses data/us.duckdb only.
 """
 from __future__ import annotations

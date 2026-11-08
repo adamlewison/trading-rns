@@ -52,7 +52,7 @@ def estimate() -> dict:
         n_ciks = con.execute("SELECT count(DISTINCT cik) FROM sec_filings").fetchone()[0]
     est = {"earnings_filings": n_e, "news_filings": n_n, "ciks": n_ciks,
            "earnings_gb": n_e * EST_BYTES["earnings"] / 1e9, "news_gb": n_n * EST_BYTES["news"] / 1e9,
-           "earnings_hours_at_5rps": n_e * 2 / 5 / 3600, "news_hours_at_5rps": n_n * 2 / 5 / 3600,
+           "earnings_hours": n_e * 2 * c["min_interval_s"] / 3600, "news_hours": n_n * 2 * c["min_interval_s"] / 3600,
            "bulk_zips_gb": 3.0, "facts_db_gb": 0.6}
     est["total_gb"] = est["earnings_gb"] + est["news_gb"] + est["bulk_zips_gb"] + est["facts_db_gb"]
     est["free_gb"] = shutil.disk_usage(c["raw_dir"]).free / 1e9

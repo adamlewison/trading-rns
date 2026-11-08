@@ -66,9 +66,9 @@ us:
   raw_dir: data/raw/us
   backup_prefix: trading-rns/us/v1
   start_year: 2012
-  # SEC fair-access policy: max 10 req/s. We stay at ~5.
+  # SEC fair-access policy: max 10 req/s. We cap at 8 (user decision 2026-11-08; margin so we never trip their 10-minute block).
   # User-Agent comes from SEC_USER_AGENT in .env ("Name email"); required, never hard-coded.
-  min_interval_s: 0.2
+  min_interval_s: 0.125
   forms: ["8-K", "8-K/A"]
   earnings_items: ["2.02"]
   news_items: ["1.01", "2.01", "7.01", "8.01"]
