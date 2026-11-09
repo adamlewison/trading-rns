@@ -31,9 +31,11 @@ from ingest.us.common import session
 
 log = get_logger("llm")
 
-PROMPT_VERSION = "us-earnings-v1"
-MAX_CHARS = 40_000          # longer releases are cut here (flagged); the headline numbers come first
-CHARS_PER_TOKEN = 3.3       # rough, for the estimate before any API call; the report gives the real count
+PROMPT_VERSION = "us-earnings-v2"
+# v1 (pilot 2026-11-09): 40k chars, guidance as one label, events without evidence. v2: shorter input,
+# guidance figures + only an explicitly stated change, each event backed by a quote.
+MAX_CHARS = 25_000          # longer releases are cut here (flagged); the headline numbers come first
+CHARS_PER_TOKEN = 2.4       # rough, for the estimate before any API call; the report gives the real count
 RUNS_DIR = ROOT / "data" / "llm"
 
 SYSTEM = f"""You read US company earnings press releases and extract facts for a quantitative trading study.
@@ -48,8 +50,14 @@ Rules:
 - "prior_year" means the same period one year earlier, as shown in the release.
 - GAAP diluted EPS and adjusted (non-GAAP) EPS are different fields; don't put one in the other.
 - vs_consensus: only if the text itself compares results with analyst expectations; otherwise not_mentioned.
-- guidance: the company's outlook in this release compared with its previous outlook. "initiated" if it
-  gives an outlook for the first time, "none" if there is no outlook.
+- Guidance (the company's own outlook for a future period): guidance_given says whether this release
+  gives any. Copy the figures for the main period it covers. guidance_change_stated is "raised",
+  "lowered", "maintained", "withdrawn" or "mixed" ONLY if the text explicitly compares the outlook
+  with a previous one (e.g. "raises full-year guidance"); otherwise "not_stated".
+- Events: include an event only if this release says it happened or was decided in this period, and
+  give a short exact quote (at most 15 words) from the text as evidence. A buyback counts only if
+  shares were repurchased in the period or a new or enlarged programme is announced; a mere mention
+  of an existing authorisation doesn't. Regular unchanged dividends are not an event.
 - tone: how good the news is for shareholders overall, -2 (very bad) to +2 (very good).
 - If the document is not an earnings release, set is_earnings_release false and fill what you can."""
 
@@ -72,11 +80,15 @@ SCHEMA = {
         "eps_diluted_gaap": _NUM, "eps_diluted_gaap_prior_year": _NUM,
         "eps_adjusted": _NUM, "eps_adjusted_prior_year": _NUM,
         "vs_consensus": {"type": "string", "enum": ["beat", "in_line", "missed", "mixed", "not_mentioned"]},
-        "guidance": {"type": "string", "enum": ["raised", "maintained", "lowered", "initiated", "withdrawn", "mixed", "none"]},
+        "guidance_given": {"type": "boolean"},
+        "guidance_period": {"type": ["string", "null"], "description": "e.g. Q3 2018, FY2021"},
+        "guidance_change_stated": {"type": "string", "enum": ["raised", "lowered", "maintained", "withdrawn", "mixed", "not_stated"]},
         "guidance_revenue_low_m": _NUM, "guidance_revenue_high_m": _NUM,
         "guidance_eps_low": _NUM, "guidance_eps_high": _NUM,
         "tone": {"type": "integer", "enum": [-2, -1, 0, 1, 2]},
-        "events": {"type": "array", "items": {"type": "string", "enum": EVENTS}},
+        "events": {"type": "array", "items": {
+            "type": "object", "additionalProperties": False, "required": ["type", "evidence"],
+            "properties": {"type": {"type": "string", "enum": EVENTS}, "evidence": {"type": "string"}}}},
         "key_points": {"type": "string", "description": "at most 40 words"},
         "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
     },
@@ -156,8 +168,17 @@ def estimate_cost(requests: list[dict]) -> dict:
             "usd_est": round(usd, 3), "gbp_est": round(usd * c["usd_gbp"], 3)}
 
 
-def prepare(n: int, n_leak: int, seed: int = 7) -> Path:
-    df = sample(n, seed)
+def sample_from(run: Path) -> pd.DataFrame:
+    """The same releases as an earlier run, so prompt versions can be compared like for like."""
+    acc = pd.read_parquet(run / "sample.parquet", columns=["accession"]).accession.tolist()
+    with session(read_only=True) as con:
+        df = con.execute("""SELECT accession, cik, acceptance_et, session, doc_type, chars, text
+                            FROM us_filing_docs WHERE list_contains(?, accession)""", [acc]).df()
+    return df.set_index("accession").loc[acc].reset_index()
+
+
+def prepare(n: int, n_leak: int, seed: int = 7, reuse: Path | None = None) -> Path:
+    df = sample_from(reuse) if reuse else sample(n, seed)
     ids = identities([int(c) for c in df.cik.unique()])
     texts, truncated = [], []
     for row in df.itertuples():
@@ -169,7 +190,7 @@ def prepare(n: int, n_leak: int, seed: int = 7) -> Path:
     df["names"] = [json.dumps(ids.get(int(c), ([], []))[0]) for c in df.cik]
     df["tickers"] = [json.dumps(ids.get(int(c), ([], []))[1]) for c in df.cik]
 
-    run = RUNS_DIR / f"us-earnings-pilot-{datetime.now():%Y%m%dT%H%M%S}"
+    run = RUNS_DIR / f"us-earnings-pilot-{PROMPT_VERSION[-2:]}-{datetime.now():%Y%m%dT%H%M%S}"
     run.mkdir(parents=True)
     reqs = [{"custom_id": f"e-{a}", "params": params(SYSTEM, SCHEMA, t)}
             for a, t in zip(df.accession, df.anon_text)]
@@ -182,6 +203,7 @@ def prepare(n: int, n_leak: int, seed: int = 7) -> Path:
     df.drop(columns=["text"]).to_parquet(run / "sample.parquet")
     est = estimate_cost(reqs)
     meta = {"prompt_version": PROMPT_VERSION, "model": llm_cfg()["model"], "seed": seed, "n": len(df),
+            "sample_from": reuse.name if reuse else None,
             "n_leak": len(leak), "truncated": int(sum(truncated)), "created": datetime.now().isoformat(),
             "estimate": est}
     (run / "run.json").write_text(json.dumps(meta, indent=1))
@@ -337,6 +359,12 @@ def xbrl_check(labels: pd.DataFrame, sample_df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def event_types(labels: pd.DataFrame) -> pd.Series:
+    """Event names whether stored as strings (v1) or {type, evidence} objects (v2)."""
+    e = labels.events.explode().dropna()
+    return e.map(lambda x: x["type"] if isinstance(x, dict) else x)
+
+
 def report(run: Path) -> str:
     c = llm_cfg()
     meta = json.loads((run / "run.json").read_text())
@@ -359,14 +387,21 @@ def report(run: Path) -> str:
                   f"£{per_doc_usd * n_all.get('earnings', 0) * c['usd_gbp']:.0f}", ""]
         fill = {k: f"{labels[k].notna().mean():.0%}" for k in
                 ["revenue_m", "revenue_prior_year_m", "eps_diluted_gaap", "eps_diluted_gaap_prior_year",
-                 "eps_adjusted", "period_end_date", "guidance_eps_low", "guidance_revenue_low_m"]}
+                 "eps_adjusted", "period_end_date", "guidance_eps_low", "guidance_revenue_low_m"] if k in labels}
         lines += ["filled:", json.dumps(fill), "",
                   "is_earnings_release: " + json.dumps(labels.is_earnings_release.value_counts().to_dict()),
                   "tone: " + json.dumps(labels.tone.value_counts().sort_index().to_dict()),
                   "vs_consensus: " + json.dumps(labels.vs_consensus.value_counts().to_dict()),
-                  "guidance: " + json.dumps(labels.guidance.value_counts().to_dict()),
+                  *(["guidance: " + json.dumps(labels.guidance.value_counts().to_dict())] if "guidance" in labels else
+                    ["guidance_given: " + json.dumps(labels.guidance_given.value_counts().to_dict()),
+                     "guidance_change_stated: " + json.dumps(labels.guidance_change_stated.value_counts().to_dict())]),
                   "confidence: " + json.dumps(labels.confidence.value_counts().to_dict()),
-                  "events: " + json.dumps(labels.events.explode().value_counts().head(10).to_dict()), ""]
+                  "events: " + json.dumps(event_types(labels).value_counts().head(10).to_dict()), ""]
+        ev = labels.explode("events").dropna(subset=["events"])
+        bb = [e for e in ev.events if isinstance(e, dict) and e["type"] == "buyback"]
+        if bb:
+            ok = sum(bool(re.search(r"repurchas|buy ?-?back", e["evidence"], re.I)) for e in bb)
+            lines += [f"buyback evidence quotes that mention a repurchase: {ok} of {len(bb)}", ""]
         x = xbrl_check(labels, sample_df)
         if len(x):
             lines += [f"EPS check vs later XBRL filing: {x.match.sum()} of {len(x)} match within 1 cent "
@@ -387,6 +422,7 @@ def main() -> None:
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("prepare"); p.add_argument("--n", type=int, default=None); p.add_argument("--leak", type=int, default=50)
     p.add_argument("--seed", type=int, default=7)
+    p.add_argument("--reuse", help="run folder whose sample to reuse (compare prompt versions)")
     r = sub.add_parser("run-remote"); r.add_argument("name"); r.add_argument("--yes-spend", action="store_true")
     q = sub.add_parser("pull"); q.add_argument("name")
     for name in ("submit", "fetch", "report", "backup"):
@@ -395,7 +431,7 @@ def main() -> None:
             s.add_argument("--yes-spend", action="store_true")
     a = ap.parse_args()
     if a.cmd == "prepare":
-        print(prepare(a.n or int(llm_cfg()["pilot_size"]), a.leak, a.seed))
+        print(prepare(a.n or int(llm_cfg()["pilot_size"]), a.leak, a.seed, Path(a.reuse) if a.reuse else None))
         return
     if a.cmd == "run-remote":                       # on the droplet
         run = pull_run(a.name)

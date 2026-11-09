@@ -31,7 +31,7 @@ def _result(cid, data, ok=True, stop="end_turn"):
 
 
 def test_parse_results_and_leak_check(tmp_path):
-    lab = {k: None for k in ue.SCHEMA["properties"]} | {"tone": 1, "events": []}
+    lab = {k: None for k in ue.SCHEMA["properties"]} | {"tone": 1, "events": [{"type": "buyback", "evidence": "repurchased 1m shares"}]}
     rows = [_result("e-0000320193-20-000010", lab),
             _result("e-0000320193-20-000011", None, ok=False),
             _result("l-0000320193-20-000010", {"company_guess": "Apple Inc", "ticker_guess": None, "confidence": "high"}),
