@@ -57,6 +57,10 @@ results look better than they really are is flagged with ⚠️.
   suspect row as unusable, not just the flagged row.
 - **⚠️ Delisted prices:** only 13 of the first 53 delisted tickers found had any Yahoo history,
   and some of those 13 may be a different company that reused the TIDM.
+  Final count (2026-11-09): 420 delisted companies have announcements, only 43 have any prices.
+  Their 40,357 pre-open announcements (27% of all pre-open news) can't be labelled, and the
+  SETS/SETSqx map is missing for 397 of them. A UK backtest is survivors-only unless we buy
+  delisted UK prices.
 - Prices are in the trading currency (mostly GBX = pence; a few USD/EUR AIM lines). The currency
   is stored in `universe.currency`.
 

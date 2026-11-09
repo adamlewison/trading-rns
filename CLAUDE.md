@@ -4,7 +4,7 @@ Goal: an automated trading system that makes money after costs. Not tied to a ma
 
 ## Status
 - **Phase 1 (data):**
-  - UK: announcement text complete (2026-11-09: 314,286 announcements + 252,503 admin). Droplet migrated to the new layout (`data/uk.duckdb`); `ingest/uk/run_all.sh` finishing the last steps.
+  - UK: **complete** (2026-11-09): 314,339 announcements + 252,544 admin, 147,980 bodies, prices for 874 tickers, SETS/SETSqx map. 47 new bodies skipped (Investegate 403s on administration notices). Only 43 of 420 delisted companies have prices (see ASSUMPTIONS.md). Final report given; waiting for the Phase 2 go-ahead.
   - US: metadata, facts and prices are done; filing documents downloading on the droplet (2 workers sharing the 8 req/s cap, `us.workers`). Earnings first, then news (~524k filings).
 - **Phases 2–5 (LLM classification, features/labels, backtest, live):** not started. Phase 2 model is decided: Haiku 5.5 via Anthropic Batch API, anonymised text, pilot of 500 first (see ASSUMPTIONS.md).
 
@@ -35,10 +35,10 @@ Goal: an automated trading system that makes money after costs. Not tied to a ma
 - **Monitor from anywhere** (read-only):
   `uv run python -W ignore -m core.backup status --remote --profile uk|us`
 - **Get the data locally:**
-  `core.backup pull --profile uk|us --force` (add `--skip-raw` for tables only), and `pull-bulk --profile us` for the SEC zips.
+  `core.backup pull --profile uk|us --force` (add `--skip-raw` for tables only), and `pull-bulk --profile us` for the SEC zips. After a UK pull, run `uv run python -m ingest.uk.announcements.run build` (the `announcements` tables are derived, not backed up).
 
 ## Pending
-1. When `uk_run.out` says `UK FULL RUN COMPLETE`, pull the UK data and give the final Phase 1 report: row counts per year/category, 10 samples, delisted coverage. Wait for the Phase 2 go-ahead.
+1. When `us_run.out` says `US FULL RUN COMPLETE`, pull the US data and give the final US Phase 1 report. Phase 2 needs the user's go-ahead (the earnings filings are enough for the pilot).
 2. **UK market makers:** the user downloads LSE's "Registered Market Makers by Security" file by hand (the site blocks scripts). Then run:
    `uv run python -m ingest.uk.trading_service import-mm FILE`
 3. Survivorship fix for US prices: options are in the README. Nothing has been bought.
