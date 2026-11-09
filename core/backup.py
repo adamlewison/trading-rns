@@ -46,8 +46,9 @@ from core.log import get_logger
 log = get_logger("backup")
 
 RAW_PART_MAX_BYTES = 400 * 1024 * 1024
-INCR_PART_ROWS = 5000                 # rows per incremental part (US doc texts run ~30KB each)
-EXPORT_MEMORY_LIMIT = "300MB"          # DuckDB cap during exports on the 1GB droplet
+INCR_PART_ROWS = 2000                 # rows per incremental part (US doc texts run ~20KB each)
+EXPORT_MEMORY_LIMIT = "400MB"          # DuckDB cap during exports on the 1GB droplet
+EXPORT_ROW_GROUP = 1000                # parquet buffers a whole row group in memory; default 122,880 rows OOMs on big texts
 
 
 @dataclass
@@ -196,13 +197,15 @@ def _save_manifest(store: Store, prefix: str, m: dict, p: Path) -> None:
 
 
 def _export(con, sql: str) -> bytes:
-    # The droplet has 1GB RAM shared with the scraper: one thread, no ordering guarantee,
-    # a hard cap and spill-to-disk keep COPY from running out of memory (it did on 2026-11-09).
+    # The droplet has 1GB RAM shared with the scraper. Parquet buffers a whole row group in memory,
+    # and the default (122,880 rows) of ~30KB texts ran it out of memory on 2026-11-09: small row
+    # groups, one thread and a hard cap keep COPY small.
     with tempfile.TemporaryDirectory() as d:
+        # (spills go to DuckDB's default <db>.tmp; temp_directory can't be changed once used)
         con.execute("SET threads=1; SET preserve_insertion_order=false; "
-                    f"SET memory_limit='{EXPORT_MEMORY_LIMIT}'; SET temp_directory='{d}/spill'")
+                    f"SET memory_limit='{EXPORT_MEMORY_LIMIT}'")
         f = Path(d) / "x.parquet"
-        con.execute(f"COPY ({sql}) TO '{f}' (FORMAT parquet, COMPRESSION zstd)")
+        con.execute(f"COPY ({sql}) TO '{f}' (FORMAT parquet, COMPRESSION zstd, ROW_GROUP_SIZE {EXPORT_ROW_GROUP})")
         return f.read_bytes()
 
 
