@@ -101,6 +101,9 @@ llm:
   confirm_cost_above_gbp: 5.0
   pilot_size: 500
   context_prev_announcements: 3
+  price_in_per_mtok: 0.10          # USD, Haiku 5.5, prompts <= 100K tokens (check current pricing)
+  price_out_per_mtok: 0.50         # output includes thinking tokens
+  usd_gbp: 0.79
 
 costs:                            # UK
   slippage_pct: 0.25              # each side, % of price

@@ -4,9 +4,9 @@
 one strategy; whatever wins in an honest backtest gets traded.
 
 The first strategy being tested: a company publishes news outside market hours, Claude reads and
-labels it, a model scores it, and strong signals are bought at the open with a bracket exit
-(e.g. +5% target, −3% stop, out by day 3). This only works if prices underreact and keep drifting
-for 1–3 days.
+labels it, a model scores it together with the company's financials, the earnings surprise and the
+price reaction, and strong signals are bought at the open. It must beat a no-Claude baseline, and
+only a few exit rules written down in advance are tested. **[`PLAN.md`](PLAN.md) has the full design.**
 
 Two candidate markets, built the same way and judged on the same terms:
 - **US** (SEC 8-K filings, IBKR execution): low costs (no stamp duty, tight spreads, $0.005/share),
@@ -22,8 +22,8 @@ The aim is an honest answer. Every assumption that might flatter results is list
 
 | Phase | What | UK | US |
 |---|---|---|---|
-| 1 | Data collection | announcement text downloading | filings metadata, facts and prices done; documents ready to start |
-| 2 | LLM classification | not started | not started |
+| 1 | Data collection | done | earnings done; news downloading |
+| 2 | LLM classification | not started | pilot built (`classify/us_earnings.py`) |
 | 3 | Features & labels | not started | not started |
 | 4 | Backtest | not started | not started |
 | 5 | Live alerts | only if the backtest says so | |
@@ -31,6 +31,7 @@ The aim is an honest answer. Every assumption that might flatter results is list
 ## Layout
 
 ```
+PLAN.md            the design: inputs, phases, exit rules, guards against overfitting
 config.yaml        all settings: shared ones first, then one section per market (uk:, us:)
 core/              market-agnostic engine
   config.py          load config.yaml + .env; market("uk"|"us") gives one market's settings
@@ -47,7 +48,9 @@ ingest/            Phase 1 data collection
       schema.py        its tables
       backup.py        what it backs up + its remote status report
       run_all.sh       every step in order (resumable)
-classify/ features/ backtest/ live/    Phases 2–5 (not started)
+classify/          Phase 2: anonymise.py (strip names/tickers/URLs), us_earnings.py (US pilot:
+                   prepare / submit / fetch / report; runs in data/llm/<run>/, backed up to B2)
+features/ backtest/ live/    Phases 3–5 (not started)
 deploy/            droplet setup: setup-uk.sh, setup-us.sh, backup-loop.sh, cloud-init.yaml,
                    migrate-layout.sh (one-time move of older checkouts to this layout)
 tests/             pytest, mirroring the code: core/, shared/, uk/, us/
@@ -225,3 +228,13 @@ bash deploy/setup-us.sh      # separate checkout; asks for SEC_USER_AGENT if mis
 Checkouts from before the UK/US layout (with `data/rns.duckdb`) are moved over once with
 `git pull && bash deploy/migrate-layout.sh`, **after** the UK scrape has finished. It refuses to
 run while the scrape is running.
+
+## Phase 2: Claude labels (US earnings pilot)
+
+```
+uv run python -m classify.us_earnings prepare            # sample 500 + 50 leak checks, anonymise, estimate (no API)
+uv run python -m classify.us_earnings submit data/llm/<run>   # 1 test call, then the batch (refuses above £5 without --yes-spend)
+uv run python -m classify.us_earnings fetch  data/llm/<run>   # waits, stores raw results, copies the run to B2
+uv run python -m classify.us_earnings report data/llm/<run>   # fill rates, EPS vs XBRL, leak rate, real cost
+```
+Needs an Anthropic API key (environment network secret for api.anthropic.com, never in .env or chat).

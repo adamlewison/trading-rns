@@ -6,11 +6,13 @@ Goal: an automated trading system that makes money after costs. Not tied to a ma
 - **Phase 1 (data):**
   - UK: **complete** (2026-11-09): 314,339 announcements + 252,544 admin, 147,980 bodies, prices for 874 tickers, SETS/SETSqx map. 47 new bodies skipped (Investegate 403s on administration notices). Only 43 of 420 delisted companies have prices (see ASSUMPTIONS.md). Final report given; waiting for the Phase 2 go-ahead.
   - US: metadata, facts and prices are done; filing documents downloading on the droplet (2 workers sharing the 8 req/s cap, `us.workers`). Earnings first, then news (~524k filings).
-- **Phases 2–5 (LLM classification, features/labels, backtest, live):** not started. Phase 2 model is decided: Haiku 5.5 via Anthropic Batch API, anonymised text, pilot of 500 first (see ASSUMPTIONS.md).
+- **Plan revised 2026-11-09 (PLAN.md):** model inputs = Claude labels + numbers from the release + earnings surprise + point-in-time XBRL financials + 8-K item codes + price context; a no-Claude baseline must be beaten; exit rules fixed in advance; walk-forward with 2022–26 touched once.
+- **Phase 2:** user approved the US earnings pilot (Haiku 5.5 batch, anonymised, 500 + 50 leak checks, ~£0.24). Built (`classify/`). The Anthropic key can't be stored in cloud sessions, so the paid step runs on the droplet (`run-remote`, key in `/opt/trading-rns-us/.env`); prepare/report run here. Prepared run: `us-earnings-pilot-20261109T224927` (in B2 under `trading-rns/llm/v1/`). Full runs need a separate OK.
+- **Phases 3–5:** not started.
 
 ## Working rules
 - Go phase by phase. **Stop at the end of each phase**, report, and wait for the user's go-ahead.
-- **Data collection only** until told otherwise: no LLM calls, features or backtests.
+- No features or backtests until told. LLM calls only as approved (the US earnings pilot is approved; full runs need a separate OK).
 - Be conservative. Flag anything that could flatter results.
 - Never buy anything. Ask before spending: no LLM call costing over £5 without confirmation (`llm.confirm_cost_above_gbp`), and no DigitalOcean upgrades.
 - **Scraping:**
@@ -38,7 +40,8 @@ Goal: an automated trading system that makes money after costs. Not tied to a ma
   `core.backup pull --profile uk|us --force` (add `--skip-raw` for tables only), and `pull-bulk --profile us` for the SEC zips. After a UK pull, run `uv run python -m ingest.uk.announcements.run build` (the `announcements` tables are derived, not backed up).
 
 ## Pending
-1. When `us_run.out` says `US FULL RUN COMPLETE`, pull the US data and give the final US Phase 1 report. Phase 2 needs the user's go-ahead (the earnings filings are enough for the pilot).
-2. **UK market makers:** the user downloads LSE's "Registered Market Makers by Security" file by hand (the site blocks scripts). Then run:
+1. Pilot: after the user runs `run-remote` on the droplet, `pull` + `report` here and report fill rates, EPS-vs-XBRL accuracy, leak rate, real cost. Stop for the OK on the full run.
+2. When `us_run.out` says `US FULL RUN COMPLETE`, pull the US data and give the final US Phase 1 report. Phase 2 needs the user's go-ahead (the earnings filings are enough for the pilot).
+3. **UK market makers:** the user downloads LSE's "Registered Market Makers by Security" file by hand (the site blocks scripts). Then run:
    `uv run python -m ingest.uk.trading_service import-mm FILE`
-3. Survivorship fix for US prices: options are in the README. Nothing has been bought.
+4. Survivorship fix for US prices: options are in the README. Nothing has been bought.

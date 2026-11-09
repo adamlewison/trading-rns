@@ -126,6 +126,11 @@ results look better than they really are is flagged with ⚠️.
   stripped from the text before classification (`llm.anonymise`). It's imperfect, because distinctive
   details (project names, places) can still identify a company. Label quality should be compared on
   pre- and post-training-cutoff announcements.
+- **Truncation:** releases longer than 40,000 characters (after anonymising) are cut, and this is
+  flagged per document. The headline numbers come first in a release, but long tables at the end can be lost.
+- **EPS accuracy check:** extracted GAAP diluted EPS is compared with the figure the company later
+  filed in XBRL for the same period. That later figure is used only to measure accuracy, never as a
+  trading input, because it wasn't public on the trade date.
 - **Model drift:** API models get retired, so labels can't be regenerated with the exact same model
   later. The raw responses are stored so labels never have to be regenerated.
 
