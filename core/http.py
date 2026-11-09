@@ -1,10 +1,12 @@
 """Polite HTTP client: honest User-Agent, robots.txt, per-host rate limit, retries with
-backoff, and a permanent on-disk cache so nothing is downloaded twice."""
+backoff, and a permanent on-disk cache so nothing is downloaded twice. Thread-safe: several
+worker threads can share one client and the per-host rate limit still holds across all of them."""
 from __future__ import annotations
 
 import gzip
 import hashlib
 import json
+import threading
 import time
 import urllib.robotparser
 from pathlib import Path
@@ -46,8 +48,9 @@ class PoliteClient:
             timeout=s["timeout_s"],
             follow_redirects=True,
         )
-        self._last: dict[str, float] = {}
+        self._last: dict[str, float] = {}          # host -> start time of the latest reserved request
         self._robots: dict[str, urllib.robotparser.RobotFileParser] = {}
+        self._lock = threading.Lock()
         self.n_network = 0
         self.n_cache = 0
 
@@ -78,7 +81,9 @@ class PoliteClient:
             return True
         u = urlparse(url)
         base = f"{u.scheme}://{u.netloc}"
-        if base not in self._robots:
+        with self._lock:
+            if base in self._robots:
+                return self._robots[base].can_fetch(self.client.headers["User-Agent"], url)
             rp = urllib.robotparser.RobotFileParser()
             try:
                 r = self.client.get(base + "/robots.txt")
@@ -86,21 +91,30 @@ class PoliteClient:
             except httpx.HTTPError:
                 rp.parse([])
             self._robots[base] = rp
-        return self._robots[base].can_fetch(self.client.headers["User-Agent"], url)
+            return rp.can_fetch(self.client.headers["User-Agent"], url)
 
     def _wait(self, host: str) -> None:
-        last = self._last.get(host)
-        if last is not None:
-            dt = time.monotonic() - last
-            if dt < self.min_interval:
-                time.sleep(self.min_interval - dt)
-        self._last[host] = time.monotonic()
+        """Start-to-start pacing per host, shared by every thread: each caller reserves the next free
+        slot under the lock, then sleeps until it outside the lock."""
+        with self._lock:
+            now = time.monotonic()
+            last = self._last.get(host)
+            slot = now if last is None else max(now, last + self.min_interval)
+            self._last[host] = slot
+        if slot > now:
+            time.sleep(slot - now)
+
+    def _pause(self, host: str, seconds: float) -> None:
+        """A refusal/overload backs off every thread on that host, not just the one that saw it."""
+        with self._lock:
+            self._last[host] = max(self._last.get(host, 0.0), time.monotonic() + seconds - self.min_interval)
 
     # ---------- public ----------
     def get(self, url: str, use_cache: bool = True) -> tuple[int, bytes]:
         """Return (status, body). 404s are cached too (as status 404) so we don't retry them."""
         if use_cache and self.cached(url):
-            self.n_cache += 1
+            with self._lock:
+                self.n_cache += 1
             return self._read_cache(url)
         if not self._allowed(url):
             raise RobotsDisallowed(url)
@@ -116,11 +130,13 @@ class PoliteClient:
                 log.warning("network error %s on %s; retry in %.0fs", e, url, sleep)
                 time.sleep(sleep)
                 continue
-            self.n_network += 1
+            with self._lock:
+                self.n_network += 1
             if r.status_code in RETRY_STATUS and attempt < self.max_retries:
                 ra = r.headers.get("Retry-After")
                 sleep = float(ra) if ra and ra.isdigit() else self.backoff * 2**attempt
                 log.warning("HTTP %s on %s; retry in %.0fs", r.status_code, url, sleep)
+                self._pause(host, sleep)
                 time.sleep(sleep)
                 continue
             if r.status_code in (200, 404, 410):

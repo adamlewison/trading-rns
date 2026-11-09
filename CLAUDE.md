@@ -5,7 +5,7 @@ Goal: an automated trading system that makes money after costs. Not tied to a ma
 ## Status
 - **Phase 1 (data):**
   - UK: announcement text complete (2026-11-09: 314,286 announcements + 252,503 admin). Droplet migrated to the new layout (`data/uk.duckdb`); `ingest/uk/run_all.sh` finishing the last steps.
-  - US: metadata, facts and prices are done; the document download is set up via `deploy/setup-us.sh`.
+  - US: metadata, facts and prices are done; filing documents downloading on the droplet (2 workers sharing the 8 req/s cap, `us.workers`). Earnings first, then news (~524k filings).
 - **Phases 2–5 (LLM classification, features/labels, backtest, live):** not started. Phase 2 model is decided: Haiku 5.5 via Anthropic Batch API, anonymised text, pilot of 500 first (see ASSUMPTIONS.md).
 
 ## Working rules

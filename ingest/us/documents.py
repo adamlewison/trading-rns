@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shutil
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 from core.http import Blocked
@@ -26,6 +27,7 @@ from ingest.us.parse import (
 # bytes per filing measured on a 400-filing pilot (Nov 2026): gzipped header page + gzipped
 # document in the raw cache + extracted text in DuckDB (~1/3 of chars after compression)
 EST_TEXT_BYTES = {"earnings": 10_000, "news": 5_500}   # extracted text kept in us.duckdb
+BATCH = 100   # filings handed to the workers at a time (a stop takes effect within one batch)
 EST_BYTES = {"earnings": 1_800 + 21_500 + 10_000, "news": 1_800 + 8_100 + 5_500}
 
 
@@ -81,7 +83,10 @@ def docs(group: str, limit: int | None, assume_yes: bool, year: int | None = Non
                 con.executemany("INSERT OR REPLACE INTO us_filing_docs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", buf)
             buf.clear()
 
-    for i, (acc, cik, form, pdoc) in enumerate(todo, 1):
+    def fetch(item):
+        """Network + parsing for one filing (runs in a worker thread). Returns the row, or the
+        Blocked exception so the main thread can count it."""
+        acc, cik, form, _pdoc = item
         base = filing_base_url(cik, acc)
         row = dict(acc=acc, cik=cik, group=group, form=form, items=None, et=None, utc=None, sess=None,
                    dtype=None, dname=None, durl=None, text=None, chars=0, status="error")
@@ -109,25 +114,41 @@ def docs(group: str, limit: int | None, assume_yes: bool, year: int | None = Non
                         row["text"] = html_to_text(raw.decode("utf-8", errors="replace"))
                         row["chars"] = len(row["text"])
                         row["status"] = "ok" if row["chars"] else "empty"
-            consecutive_blocks = 0
         except Blocked as e:
-            consecutive_blocks += 1
-            log.error("blocked (%d in a row): %s", consecutive_blocks, e)
-            if consecutive_blocks >= 3:
-                flush()
-                log.error("STOPPING: SEC appears to be refusing/rate-limiting us")
-                raise SystemExit(3)
-            continue                                    # not recorded -> retried next run
+            return e
         except Exception as e:
             log.warning("doc %s failed: %s", acc, e)
-        buf.append([row["acc"], row["cik"], row["group"], row["form"], row["items"], row["et"], row["utc"],
-                    row["sess"], row["dtype"], row["dname"], row["durl"], row["text"], row["chars"],
-                    row["status"], datetime.now()])
-        if len(buf) >= 50 or i == len(todo):
-            flush()
-            if shutil.disk_usage(c["raw_dir"]).free < min_free:
-                log.error("STOPPING: free disk below %.1f GB (rerun resumes; free space first)", min_free / 1e9)
-                raise SystemExit(4)
-        if i % 500 == 0:
-            log.info("docs[%s] %d/%d | net=%d cache=%d", group, i, len(todo), client.n_network, client.n_cache)
+        return row
+
+    # Workers share the client, so the per-host rate limit (min_interval_s) holds across all of
+    # them: more workers only fill the time spent waiting for SEC's replies, never exceed 8 req/s.
+    workers = max(1, int(c.get("workers", 1)))
+    log.info("docs[%s]: %d worker(s) sharing min_interval_s=%s", group, workers, c["min_interval_s"])
+    i = 0
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        for start in range(0, len(todo), BATCH):
+            for res in pool.map(fetch, todo[start:start + BATCH]):   # results in input order
+                i += 1
+                if isinstance(res, Blocked):
+                    consecutive_blocks += 1
+                    log.error("blocked (%d in a row): %s", consecutive_blocks, res)
+                    if consecutive_blocks >= 3:
+                        flush()
+                        log.error("STOPPING: SEC appears to be refusing/rate-limiting us")
+                        raise SystemExit(3)
+                    continue                            # not recorded -> retried next run
+                consecutive_blocks = 0
+                row = res
+                buf.append([row["acc"], row["cik"], row["group"], row["form"], row["items"], row["et"],
+                            row["utc"], row["sess"], row["dtype"], row["dname"], row["durl"], row["text"],
+                            row["chars"], row["status"], datetime.now()])
+                if len(buf) >= 50:
+                    flush()
+                    if shutil.disk_usage(c["raw_dir"]).free < min_free:
+                        log.error("STOPPING: free disk below %.1f GB (rerun resumes; free space first)",
+                                  min_free / 1e9)
+                        raise SystemExit(4)
+                if i % 500 == 0:
+                    log.info("docs[%s] %d/%d | net=%d cache=%d", group, i, len(todo),
+                             client.n_network, client.n_cache)
     flush()
