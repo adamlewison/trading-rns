@@ -40,7 +40,7 @@ Goal: an automated trading system that makes money after costs. Not tied to a ma
   `core.backup pull --profile uk|us --force` (add `--skip-raw` for tables only), and `pull-bulk --profile us` for the SEC zips. After a UK pull, run `uv run python -m ingest.uk.announcements.run build` (the `announcements` tables are derived, not backed up).
 
 ## Pending
-1. Pilot: after the user runs `run-remote` on the droplet, `pull` + `report` here and report fill rates, EPS-vs-XBRL accuracy, leak rate, real cost. Stop for the OK on the full run.
+1. Pilot v1 done 2026-11-09 (report in data/llm/us-earnings-pilot-20261109T224927/report.txt): 550/550 ok, EPS 98% match XBRL, cost £0.27 (full earnings run ≈ £134 at 40k chars), **leak 90%**, guidance 'initiated' misused, buyback over-tagged. Proposed next: prompt v2 (objective fields, fixed guidance/event rules, shorter input) re-piloted on the same 500. Waiting for the user's OK.
 2. When `us_run.out` says `US FULL RUN COMPLETE`, pull the US data and give the final US Phase 1 report. Phase 2 needs the user's go-ahead (the earnings filings are enough for the pilot).
 3. **UK market makers:** the user downloads LSE's "Registered Market Makers by Security" file by hand (the site blocks scripts). Then run:
    `uv run python -m ingest.uk.trading_service import-mm FILE`

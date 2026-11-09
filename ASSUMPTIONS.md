@@ -126,6 +126,16 @@ results look better than they really are is flagged with ⚠️.
   stripped from the text before classification (`llm.anonymise`). It's imperfect, because distinctive
   details (project names, places) can still identify a company. Label quality should be compared on
   pre- and post-training-cutoff announcements.
+- **⚠️ Anonymisation does NOT hide the company (pilot, 2026-11-09).** With names, tickers, URLs,
+  phones, IDs and filenames stripped, Haiku 5.5 still named the company in 45 of 50 releases (90%),
+  small caps included, from cities, products, executives and figures. So the model's memory of what
+  happened next can leak into any *judgement* it makes. Consequences:
+  - Use Claude mainly for **objective extraction**: numbers, guidance figures and stated events. Facts
+    copied from the text can't be coloured by hindsight, and EPS matched the later XBRL filing in
+    98% of cases.
+  - Treat subjective labels (tone) as suspect. Any use must pass a leakage test: their predictive
+    power must not be clearly higher before the model's training cutoff than after it.
+  - The no-Claude baseline is leak-free by construction.
 - **Truncation:** releases longer than 40,000 characters (after anonymising) are cut, and this is
   flagged per document. The headline numbers come first in a release, but long tables at the end can be lost.
 - **EPS accuracy check:** extracted GAAP diluted EPS is compared with the figure the company later
