@@ -4,7 +4,7 @@ Goal: an automated trading system that makes money after costs. Not tied to a ma
 
 ## Status
 - **Phase 1 (data):**
-  - UK announcement-text download is running on the droplet.
+  - UK: announcement text complete (2026-11-09: 314,286 announcements + 252,503 admin). Droplet migrated to the new layout (`data/uk.duckdb`); `ingest/uk/run_all.sh` finishing the last steps.
   - US: metadata, facts and prices are done; the document download is set up via `deploy/setup-us.sh`.
 - **Phases 2–5 (LLM classification, features/labels, backtest, live):** not started. Phase 2 model is decided: Haiku 5.5 via Anthropic Batch API, anonymised text, pilot of 500 first (see ASSUMPTIONS.md).
 
@@ -30,7 +30,7 @@ Goal: an automated trading system that makes money after costs. Not tied to a ma
   - The user connects via Termius. Cloud sessions can't SSH, so give them commands to run.
   - UK checkout `/opt/trading-rns`: services `trading-rns-scrape` and `trading-rns-backup`.
   - US checkout `/opt/trading-rns-us`: services `trading-rns-us` and `trading-rns-us-backup`.
-  - Logs are in `data/logs/` (`uk_run.out` or the old `full_run.out`, `announcements.log`, `http.log`, `us.log`).
+  - Logs are in `data/logs/` (`uk_run.out`, `announcements.log`, `http.log`, `us.log`).
 - **One writer per market.** The droplet is the only machine that scrapes or pushes backups. Never run a scrape or `core.backup push` elsewhere while the droplet runs; two writers corrupt the backup.
 - **Monitor from anywhere** (read-only):
   `uv run python -W ignore -m core.backup status --remote --profile uk|us`
@@ -38,13 +38,7 @@ Goal: an automated trading system that makes money after costs. Not tied to a ma
   `core.backup pull --profile uk|us --force` (add `--skip-raw` for tables only), and `pull-bulk --profile us` for the SEC zips.
 
 ## Pending
-1. When the UK run finishes (log says `PHASE1 FULL RUN COMPLETE`), the droplet is still on the old layout (`data/rns.duckdb`). The user runs:
-   ```
-   systemctl stop trading-rns-backup trading-rns-scrape
-   cd /opt/trading-rns && git pull && bash deploy/migrate-layout.sh
-   ```
-   Don't `git pull` there before the run finishes. `migrate-layout.sh` refuses to run while it's running.
-2. Then pull the UK data and give the final Phase 1 report: row counts per year/category, 10 samples, delisted coverage. Wait for the Phase 2 go-ahead.
-3. **UK market makers:** the user downloads LSE's "Registered Market Makers by Security" file by hand (the site blocks scripts). Then run:
+1. When `uk_run.out` says `UK FULL RUN COMPLETE`, pull the UK data and give the final Phase 1 report: row counts per year/category, 10 samples, delisted coverage. Wait for the Phase 2 go-ahead.
+2. **UK market makers:** the user downloads LSE's "Registered Market Makers by Security" file by hand (the site blocks scripts). Then run:
    `uv run python -m ingest.uk.trading_service import-mm FILE`
-4. Survivorship fix for US prices: options are in the README. Nothing has been bought.
+3. Survivorship fix for US prices: options are in the README. Nothing has been bought.
