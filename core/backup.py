@@ -46,6 +46,8 @@ from core.log import get_logger
 log = get_logger("backup")
 
 RAW_PART_MAX_BYTES = 400 * 1024 * 1024
+INCR_PART_ROWS = 5000                 # rows per incremental part (US doc texts run ~30KB each)
+EXPORT_MEMORY_LIMIT = "300MB"          # DuckDB cap during exports on the 1GB droplet
 
 
 @dataclass
@@ -194,7 +196,11 @@ def _save_manifest(store: Store, prefix: str, m: dict, p: Path) -> None:
 
 
 def _export(con, sql: str) -> bytes:
+    # The droplet has 1GB RAM shared with the scraper: one thread, no ordering guarantee,
+    # a hard cap and spill-to-disk keep COPY from running out of memory (it did on 2026-11-09).
     with tempfile.TemporaryDirectory() as d:
+        con.execute("SET threads=1; SET preserve_insertion_order=false; "
+                    f"SET memory_limit='{EXPORT_MEMORY_LIMIT}'; SET temp_directory='{d}/spill'")
         f = Path(d) / "x.parquet"
         con.execute(f"COPY ({sql}) TO '{f}' (FORMAT parquet, COMPRESSION zstd)")
         return f.read_bytes()
@@ -234,20 +240,31 @@ def push(store: Store | None = None, profile: str = "uk", prune_raw: bool = Fals
                               pf.name, t, rows[t])
                     continue
                 exports[t] = (h, n, _export(con, f"SELECT * FROM {t}"))
-        wm = m.get("bodies_watermark")
-        where = f"WHERE fetched_at > TIMESTAMP '{wm}'" if wm else ""
-        new_wm = con.execute(f"SELECT max(fetched_at) FROM {pf.incr_table} {where}").fetchone()[0]
-        bodies = _export(con, f"SELECT * FROM {pf.incr_table} {where}") if new_wm else None
     # uploads happen outside the DB lock so the scraper isn't blocked
     for t, (h, n, data) in exports.items():
         store.put(f"{prefix}/db/{t}.parquet", data)
         m["tables"][t] = h
         rows[t] = n
         uploaded.append((t, len(data)))
-    if bodies is not None:
-        store.put(f"{prefix}/db/{pf.incr_table}/part-{stamp}.parquet", bodies)
-        m["bodies_watermark"] = str(new_wm)
-        uploaded.append((pf.incr_table, len(bodies)))
+    # New rows of the big table go up in parts of at most INCR_PART_ROWS rows (a long backlog in one
+    # COPY ran the droplet out of memory). The watermark advances after each uploaded part, so an
+    # interrupted push resumes where it stopped. Rows sharing the boundary timestamp stay in one part.
+    k = 0
+    while True:
+        wm = m.get("bodies_watermark")
+        where = f"WHERE fetched_at > TIMESTAMP '{wm}'" if wm else ""
+        with session(pf.db, pf.schema) as con:
+            upper = con.execute(f"""SELECT max(fetched_at) FROM (SELECT fetched_at FROM {pf.incr_table}
+                {where} ORDER BY fetched_at LIMIT {INCR_PART_ROWS})""").fetchone()[0]
+            if upper is None:
+                break
+            cond = f"{where} AND" if where else "WHERE"
+            bodies = _export(con, f"SELECT * FROM {pf.incr_table} {cond} fetched_at <= TIMESTAMP '{upper}'")
+        store.put(f"{prefix}/db/{pf.incr_table}/part-{stamp}-{k:03d}.parquet", bodies)
+        m["bodies_watermark"] = str(upper)
+        _save_manifest(store, prefix, m, pf.manifest)
+        uploaded.append((f"{pf.incr_table} part {k}", len(bodies)))
+        k += 1
 
     raw_dir: Path = pf.raw_dir
     since = m.get("raw_watermark", 0.0)

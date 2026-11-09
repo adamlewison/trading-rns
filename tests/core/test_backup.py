@@ -140,3 +140,24 @@ def test_push_never_backs_up_a_missing_or_emptied_db(env):
         con.execute("DELETE FROM universe")
     backup.push(store, profile="uk")
     assert store.get("trading-rns/v1/db/universe.parquet") == good
+
+
+def test_large_backlog_goes_up_in_parts_and_restores(env, monkeypatch):
+    """A long backlog of new rows is pushed in several small parts (one big COPY ran the 1GB
+    droplet out of memory); rows sharing a timestamp stay together; pull restores them all once."""
+    tmp, backup, store = env
+    monkeypatch.setattr(backup, "INCR_PART_ROWS", 2)
+    from ingest.uk.common import session
+    with session() as con:
+        for i, ts in enumerate(["01", "02", "02", "02", "03"]):
+            con.execute(f"INSERT INTO ann_bodies VALUES ('s:{i}', 't', 1, 'ok', TIMESTAMP '2026-01-{ts} 10:00')")
+    backup.push(store, profile="uk")
+    parts = [n for n in store.list("trading-rns/v1/") if "/ann_bodies/" in n]
+    assert len(parts) == 2                      # [01, 02, 02, 02] then [03]
+    backup.push(store, profile="uk")            # nothing new: no extra part
+    assert len([n for n in store.list("trading-rns/v1/") if "/ann_bodies/" in n]) == 2
+    (tmp / "data/uk.duckdb").unlink()
+    (tmp / "data/backup_manifest_uk.json").unlink()
+    backup.pull(store, profile="uk")
+    with session() as con:
+        assert con.execute("SELECT count(*) FROM ann_bodies").fetchone()[0] == 5
