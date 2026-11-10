@@ -167,15 +167,13 @@ def test_export_of_big_texts_fits_a_small_memory_cap(env, tmp_path):
     """Regression for the 2026-11-09 droplet OOM: 5,000 rows of ~32KB text exported (twice, on one
     connection) under a 300MB cap; with parquet's default row groups this needed >300MB."""
     _, backup, _ = env
-    import duckdb
-    con = duckdb.connect(str(tmp_path / "big.duckdb"))
-    con.execute("CREATE TABLE t AS SELECT i, repeat(md5(i::varchar), 1000) AS text FROM range(5000) r(i)")
-    assert backup.EXPORT_MEMORY_LIMIT == "400MB"
-    con.execute("SET memory_limit='300MB'")
-    backup.EXPORT_MEMORY_LIMIT = "300MB"
+    from core.db import connect
+    assert backup.EXPORT_MEMORY_LIMIT == "300MB"
+    con = connect(tmp_path / "big.duckdb",
+                  "CREATE TABLE IF NOT EXISTS t AS SELECT i, repeat(md5(i::varchar), 1000) AS text FROM range(5000) r(i)",
+                  memory_limit=backup.EXPORT_MEMORY_LIMIT)   # push() opens its sessions this way
     try:
         for _ in range(2):
             assert len(backup._export(con, "SELECT * FROM t")) > 0
     finally:
-        backup.EXPORT_MEMORY_LIMIT = "400MB"
         con.close()
