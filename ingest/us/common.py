@@ -37,8 +37,8 @@ def user_agent() -> str:
 
 
 @contextmanager
-def session(read_only: bool = False):
-    with _db.session(us_cfg()["db"], SCHEMA, read_only=read_only) as con:
+def session(read_only: bool = False, memory_limit: str | None = None):
+    with _db.session(us_cfg()["db"], SCHEMA, read_only=read_only, memory_limit=memory_limit) as con:
         yield con
 
 

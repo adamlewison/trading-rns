@@ -68,3 +68,33 @@ def test_three_refusals_in_a_row_still_stop(us_env, monkeypatch):
     assert e.value.code == 3
     with common.session(read_only=True) as con:
         assert con.execute("SELECT count(*) FROM us_filing_docs").fetchone()[0] == 0
+
+
+def test_save_waits_out_a_memory_shortage(us_env, monkeypatch):
+    """2026-11-10: the downloader died when the backup took the droplet's memory. A save that runs
+    out of memory is retried after a pause; the rows still land and nothing is fetched twice."""
+    import duckdb
+    common, documents = us_env
+    monkeypatch.setattr(documents, "FLUSH_RETRY_S", 0)
+    real, fails = common.session, {"n": 2}
+
+    def flaky(read_only=False, memory_limit=None):
+        assert read_only or memory_limit == documents.FLUSH_MEMORY_LIMIT
+        if not read_only and fails["n"]:
+            fails["n"] -= 1
+            raise duckdb.OutOfMemoryException("failed to allocate")
+        return real(read_only=read_only, memory_limit=memory_limit)
+    monkeypatch.setattr(documents, "session", flaky)
+    _use_transport(monkeypatch, documents, lambda req: httpx.Response(
+        200, text=INDEX_HTM if str(req.url).endswith("-index.htm") else "<p>ok</p>"))
+    documents.docs("earnings", limit=None, assume_yes=True)
+    with common.session(read_only=True) as con:
+        assert con.execute("SELECT count(*) FROM us_filing_docs").fetchone()[0] == 120
+
+
+def test_memory_cap_is_applied(tmp_path):
+    from core.db import session
+    with session(tmp_path / "x.duckdb", "CREATE TABLE IF NOT EXISTS t (a INT)", memory_limit="200MB") as con:
+        lim, th = con.execute("SELECT current_setting('memory_limit'), current_setting('threads')").fetchone()
+    assert lim.startswith("190") or "MiB" in lim or "MB" in lim
+    assert th == 1

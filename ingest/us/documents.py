@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import shutil
+import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+
+import duckdb
 
 from core.http import Blocked
 from ingest.us.common import (
@@ -27,6 +30,8 @@ from ingest.us.parse import (
 # bytes per filing measured on a 400-filing pilot (Nov 2026): gzipped header page + gzipped
 # document in the raw cache + extracted text in DuckDB (~1/3 of chars after compression)
 EST_TEXT_BYTES = {"earnings": 10_000, "news": 5_500}   # extracted text kept in us.duckdb
+FLUSH_MEMORY_LIMIT = "200MB"   # DuckDB cap when saving rows (1GB droplet, shared with the backup)
+FLUSH_RETRIES, FLUSH_RETRY_S = 10, 60
 BATCH = 100   # filings handed to the workers at a time (a stop takes effect within one batch)
 EST_BYTES = {"earnings": 1_800 + 21_500 + 10_000, "news": 1_800 + 8_100 + 5_500}
 
@@ -78,10 +83,22 @@ def docs(group: str, limit: int | None, assume_yes: bool, year: int | None = Non
     buf, consecutive_blocks = [], 0
 
     def flush():
-        if buf:
-            with session() as con:
-                con.executemany("INSERT OR REPLACE INTO us_filing_docs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", buf)
-            buf.clear()
+        """Save the buffered rows. Capped memory, and a short shortage (the backup running on the same
+        1GB machine) is waited out instead of killing a multi-day run."""
+        if not buf:
+            return
+        for attempt in range(FLUSH_RETRIES):
+            try:
+                with session(memory_limit=FLUSH_MEMORY_LIMIT) as con:
+                    con.executemany("INSERT OR REPLACE INTO us_filing_docs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", buf)
+                buf.clear()
+                return
+            except duckdb.OutOfMemoryException as e:
+                if attempt == FLUSH_RETRIES - 1:
+                    raise
+                log.warning("saving %d rows ran out of memory (%s); retry %d in %ds",
+                            len(buf), str(e).splitlines()[0], attempt + 1, FLUSH_RETRY_S)
+                time.sleep(FLUSH_RETRY_S)
 
     def fetch(item):
         """Network + parsing for one filing (runs in a worker thread). Returns the row, or the

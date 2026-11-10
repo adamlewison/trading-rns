@@ -47,7 +47,7 @@ log = get_logger("backup")
 
 RAW_PART_MAX_BYTES = 400 * 1024 * 1024
 INCR_PART_ROWS = 2000                 # rows per incremental part (US doc texts run ~20KB each)
-EXPORT_MEMORY_LIMIT = "400MB"          # DuckDB cap during exports on the 1GB droplet
+EXPORT_MEMORY_LIMIT = "300MB"          # DuckDB cap for the whole push on the 1GB droplet
 EXPORT_ROW_GROUP = 1000                # parquet buffers a whole row group in memory; default 122,880 rows OOMs on big texts
 
 
@@ -201,9 +201,7 @@ def _export(con, sql: str) -> bytes:
     # and the default (122,880 rows) of ~30KB texts ran it out of memory on 2026-11-09: small row
     # groups, one thread and a hard cap keep COPY small.
     with tempfile.TemporaryDirectory() as d:
-        # (spills go to DuckDB's default <db>.tmp; temp_directory can't be changed once used)
-        con.execute("SET threads=1; SET preserve_insertion_order=false; "
-                    f"SET memory_limit='{EXPORT_MEMORY_LIMIT}'")
+        # the session already set the memory cap; spills go to DuckDB's default <db>.tmp
         f = Path(d) / "x.parquet"
         con.execute(f"COPY ({sql}) TO '{f}' (FORMAT parquet, COMPRESSION zstd, ROW_GROUP_SIZE {EXPORT_ROW_GROUP})")
         return f.read_bytes()
@@ -232,7 +230,9 @@ def push(store: Store | None = None, profile: str = "uk", prune_raw: bool = Fals
     stamp = datetime.now().strftime("%Y%m%dT%H%M%S%f")  # unique per push; parts are never overwritten
     uploaded = []
 
-    with session(pf.db, pf.schema) as con:
+    # Capped from the start: the change-check hash over us_prices_daily (16M rows) alone took ~1GB
+    # uncapped and starved the downloader, which then died out of memory (2026-11-10).
+    with session(pf.db, pf.schema, memory_limit=EXPORT_MEMORY_LIMIT) as con:
         exports = {}
         for t in pf.snapshot_tables:
             h = _content_hash(con, t)
@@ -256,7 +256,7 @@ def push(store: Store | None = None, profile: str = "uk", prune_raw: bool = Fals
     while True:
         wm = m.get("bodies_watermark")
         where = f"WHERE fetched_at > TIMESTAMP '{wm}'" if wm else ""
-        with session(pf.db, pf.schema) as con:
+        with session(pf.db, pf.schema, memory_limit=EXPORT_MEMORY_LIMIT) as con:
             upper = con.execute(f"""SELECT max(fetched_at) FROM (SELECT fetched_at FROM {pf.incr_table}
                 {where} ORDER BY fetched_at LIMIT {INCR_PART_ROWS})""").fetchone()[0]
             if upper is None:
