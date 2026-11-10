@@ -9,6 +9,7 @@ dependencies = [
     "beautifulsoup4>=4.15.0",
     "duckdb>=2.0.0",
     "httpx>=0.28.1",
+    "openai>=3.49.0",
     "openpyxl>=3.1.5",
     "pandas>=3.1.1",
     "pyarrow>=26.0.1",
