@@ -400,7 +400,7 @@ def report(run: Path) -> str:
         ev = labels.explode("events").dropna(subset=["events"])
         bb = [e for e in ev.events if isinstance(e, dict) and e["type"] == "buyback"]
         if bb:
-            ok = sum(bool(re.search(r"repurchas|buy ?-?back", e["evidence"], re.I)) for e in bb)
+            ok = sum(bool(re.search(r"repurchas|buy ?-?back|bought back|purchased .{0,40}shares|treasury stock|share purchase", e["evidence"], re.I)) for e in bb)
             lines += [f"buyback evidence quotes that mention a repurchase: {ok} of {len(bb)}", ""]
         x = xbrl_check(labels, sample_df)
         if len(x):
