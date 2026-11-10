@@ -62,7 +62,7 @@ Rules:
   outlook is also given; otherwise copy the period it does cover. guidance_period names the period you
   copied (e.g. "FY2026", "Q1 FY2026"). EPS guidance: if given on both a GAAP and an adjusted (non-GAAP)
   basis, copy the GAAP figures; guidance_eps_basis says which basis you copied ("unclear" if the text
-  doesn't say, null if there is no EPS guidance). guidance_change_stated is "raised",
+  doesn't say, "none" if there is no EPS guidance). guidance_change_stated is "raised",
   "lowered", "maintained", "withdrawn" or "mixed" ONLY if the text explicitly compares the outlook
   with a previous one (e.g. "raises full-year guidance"); otherwise "not_stated".
 - Events: include an event only if this release says it happened or was decided in this period, and
@@ -96,7 +96,7 @@ SCHEMA = {
         "guidance_change_stated": {"type": "string", "enum": ["raised", "lowered", "maintained", "withdrawn", "mixed", "not_stated"]},
         "guidance_revenue_low_m": _NUM, "guidance_revenue_high_m": _NUM,
         "guidance_eps_low": _NUM, "guidance_eps_high": _NUM,
-        "guidance_eps_basis": {"type": ["string", "null"], "enum": ["gaap", "adjusted", "unclear", None]},
+        "guidance_eps_basis": {"type": "string", "enum": ["gaap", "adjusted", "unclear", "none"]},
         "tone": {"type": "integer", "enum": [-2, -1, 0, 1, 2]},
         "events": {"type": "array", "items": {
             "type": "object", "additionalProperties": False, "required": ["type", "evidence"],
