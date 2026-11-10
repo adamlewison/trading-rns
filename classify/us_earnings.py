@@ -31,10 +31,12 @@ from ingest.us.common import session
 
 log = get_logger("llm")
 
-PROMPT_VERSION = "us-earnings-v3"
+PROMPT_VERSION = "us-earnings-v4"
 # v1 (pilot 2026-11-09): 40k chars, guidance as one label, events without evidence. v2: shorter input,
 # guidance figures + only an explicitly stated change, each event backed by a quote. v3: always the latest
 # quarter (year-end releases gave Q4 in one run and the full year in another, ~5% of releases).
+# v4: guidance always full-year when given, GAAP EPS when both bases are given, basis recorded
+# (~10% of EPS guidance flipped between next-quarter/full-year or GAAP/adjusted across runs).
 MAX_CHARS = 25_000          # longer releases are cut here (flagged); the headline numbers come first
 CHARS_PER_TOKEN = 2.4       # rough, for the estimate before any API call; the report gives the real count
 RUNS_DIR = ROOT / "data" / "llm"
@@ -50,13 +52,17 @@ Rules:
   Use null when the text doesn't state the number.
 - Period: report the most recent QUARTER. For a year-end release that shows both the fourth quarter and
   the full year, use the fourth-quarter figures (fiscal_period "Q4"). Use full-year figures (fiscal_period
-  "FY") only if the release gives no figures for the last quarter. All numbers you report, including
-  prior_year, must be for that same period.
+  "FY") only if the release gives no figures for the last quarter. All reported results, including
+  prior_year, must be for that same period (this rule is not about guidance).
 - "prior_year" means the same period one year earlier, as shown in the release.
 - GAAP diluted EPS and adjusted (non-GAAP) EPS are different fields; don't put one in the other.
 - vs_consensus: only if the text itself compares results with analyst expectations; otherwise not_mentioned.
 - Guidance (the company's own outlook for a future period): guidance_given says whether this release
-  gives any. Copy the figures for the main period it covers. guidance_change_stated is "raised",
+  gives any. If it gives a FULL-YEAR outlook, copy the full-year figures, even when a next-quarter
+  outlook is also given; otherwise copy the period it does cover. guidance_period names the period you
+  copied (e.g. "FY2026", "Q1 FY2026"). EPS guidance: if given on both a GAAP and an adjusted (non-GAAP)
+  basis, copy the GAAP figures; guidance_eps_basis says which basis you copied ("unclear" if the text
+  doesn't say, null if there is no EPS guidance). guidance_change_stated is "raised",
   "lowered", "maintained", "withdrawn" or "mixed" ONLY if the text explicitly compares the outlook
   with a previous one (e.g. "raises full-year guidance"); otherwise "not_stated".
 - Events: include an event only if this release says it happened or was decided in this period, and
@@ -90,6 +96,7 @@ SCHEMA = {
         "guidance_change_stated": {"type": "string", "enum": ["raised", "lowered", "maintained", "withdrawn", "mixed", "not_stated"]},
         "guidance_revenue_low_m": _NUM, "guidance_revenue_high_m": _NUM,
         "guidance_eps_low": _NUM, "guidance_eps_high": _NUM,
+        "guidance_eps_basis": {"type": ["string", "null"], "enum": ["gaap", "adjusted", "unclear", None]},
         "tone": {"type": "integer", "enum": [-2, -1, 0, 1, 2]},
         "events": {"type": "array", "items": {
             "type": "object", "additionalProperties": False, "required": ["type", "evidence"],
