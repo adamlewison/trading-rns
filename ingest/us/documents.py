@@ -71,7 +71,7 @@ def estimate() -> dict:
 def docs(group: str, limit: int | None, assume_yes: bool, year: int | None = None, random: bool = False) -> None:
     c = us_cfg()
     client = sec_client()
-    with session(read_only=True) as con:
+    with session(read_only=True, memory_limit=FLUSH_MEMORY_LIMIT) as con:   # 1GB droplet (OOM here 2026-11-10)
         sql = _target_sql(group) + (f" AND year(f.filing_date) = {int(year)}" if year else "")
         sql += " ORDER BY " + ("hash(f.accession)" if random else "f.filing_date DESC")
         todo = con.execute(sql + (f" LIMIT {int(limit)}" if limit else "")).fetchall()

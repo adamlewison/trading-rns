@@ -6,7 +6,16 @@
 set -u
 cd "$(dirname "$0")/../.."
 R="uv run python -W ignore -m"
-step() { "$@"; rc=$?; [ $rc -eq 0 ] || { echo "STOPPED: step failed (exit $rc): $*"; exit $rc; }; }
+# A plain failure (exit 1, e.g. a memory shortage while the backup runs) is retried twice after
+# 5 minutes; 3 (SEC refusing) and 4 (low disk) stop at once.
+step() {
+  for try in 1 2 3; do
+    "$@"; rc=$?
+    [ $rc -eq 0 ] && return 0
+    if [ $rc -ne 1 ] || [ $try -eq 3 ]; then echo "STOPPED: step failed (exit $rc): $*"; exit $rc; fi
+    echo "step failed (exit 1), retry $try/2 in 5 min: $*"; sleep 300
+  done
+}
 step $R ingest.us.run docs --group earnings --yes
 step $R ingest.us.run docs --group news --yes
 $R ingest.us.run report > data/logs/us_report.txt 2>&1
