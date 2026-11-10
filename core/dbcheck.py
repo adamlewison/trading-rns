@@ -14,9 +14,8 @@ import argparse
 import shutil
 from pathlib import Path
 
-import duckdb
-
 from core.backup import get_profile
+from core.db import connect
 
 
 def _sizes(db: Path) -> dict:
@@ -39,9 +38,10 @@ def main() -> None:
     a = ap.parse_args()
     db = Path(get_profile(a.profile).db)
     print("files before:", _sizes(db))
-    cfg = {"memory_limit": a.memory, "threads": 1, "preserve_insertion_order": False,
-           "temp_directory": str(db) + ".tmp", "max_temp_directory_size": a.max_temp}
-    con = duckdb.connect(str(db), read_only=not a.checkpoint, config=cfg)   # caps apply before WAL replay
+    pf = get_profile(a.profile)
+    # same opening as every other connection (small row groups, memory cap before any WAL replay)
+    con = connect(db, pf.schema, read_only=not a.checkpoint, memory_limit=a.memory)
+    con.execute(f"SET max_temp_directory_size='{a.max_temp}'")
     print(con.execute("PRAGMA database_size").df().T.to_string(header=False))
     for t, n in con.execute("SELECT table_name, estimated_size FROM duckdb_tables() ORDER BY 1").fetchall():
         print(f"  {t}: ~{n:,} rows")
