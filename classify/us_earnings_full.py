@@ -80,50 +80,78 @@ def cost_gbp(input_tokens: int, output_tokens: int) -> float:
     return (input_tokens * c["price_in_per_mtok"] + output_tokens * c["price_out_per_mtok"]) / 1e6 * 0.5 * c["usd_gbp"]
 
 
-def prepare(limit: int | None = None) -> Path:
+def _prep_chunk(name: str, k: int, rows: list[tuple], ids: dict, run_dir: str) -> tuple[int, list, int]:
+    """One chunk (runs in a worker process): anonymise, build the requests, gzip, upload to B2."""
     from core.backup import get_store
-    store = get_store()
-    df = select()
+    lines, index, chars_in = [], [], 0
+    for acc, cik, text in rows:
+        names, tickers = ids.get(int(cik), ([], []))
+        t = anonymise(text, names, tickers)
+        cut = len(t) > ue.MAX_CHARS
+        t = t[:ue.MAX_CHARS] + ("\n[... release truncated ...]" if cut else "")
+        p = ue.params(ue.SYSTEM, ue.SCHEMA, t)
+        chars_in += len(p["system"]) + len(p["messages"][0]["content"])
+        lines.append(json.dumps({"custom_id": f"e-{acc}", "params": p}))
+        index.append((acc, cut, k))
+    body = gzip.compress(("\n".join(lines) + "\n").encode())
+    (Path(run_dir) / "chunks" / f"chunk-{k:04d}.jsonl.gz").write_bytes(body)
+    get_store().put(f"{B2_ROOT}/{name}/chunks/chunk-{k:04d}.jsonl.gz", body)
+    return k, index, chars_in
+
+
+def prepare(limit: int | None = None, workers: int = 4) -> Path:
+    """Reads the release texts in one pass in storage order (fetching scattered rows chunk by chunk
+    took ~50s per chunk) and anonymises chunks in parallel processes."""
+    from concurrent.futures import ProcessPoolExecutor
+    from core.backup import get_store
+    sel = select()
     if limit:
-        df = df.head(limit)
+        sel = sel.head(limit)
+    wanted = set(sel.accession)
     ratio = _pilot_ratio()
     name = f"us-earnings-full-{ue.PROMPT_VERSION[-2:]}-{datetime.now():%Y%m%dT%H%M%S}"
     run = ue.RUNS_DIR / name
     (run / "chunks").mkdir(parents=True)
-    ids = ue.identities([int(c) for c in df.cik.unique()])
-    index, chars_in, n_chunks = [], 0, 0
-    for k, start in enumerate(range(0, len(df), CHUNK)):
-        part = df.iloc[start:start + CHUNK]
-        with session(read_only=True) as con:
-            texts = dict(con.execute("SELECT accession, text FROM us_filing_docs WHERE list_contains(?, accession)",
-                                     [part.accession.tolist()]).fetchall())
-        lines = []
-        for row in part.itertuples():
-            names, tickers = ids.get(int(row.cik), ([], []))
-            t = anonymise(texts[row.accession], names, tickers)
-            cut = len(t) > ue.MAX_CHARS
-            t = t[:ue.MAX_CHARS] + ("\n[... release truncated ...]" if cut else "")
-            p = ue.params(ue.SYSTEM, ue.SCHEMA, t)
-            chars_in += len(p["system"]) + len(t) + 21
-            lines.append(json.dumps({"custom_id": f"e-{row.accession}", "params": p}))
-            index.append((row.accession, int(row.cik), row.acceptance_et, row.session, int(row.chars), cut, k))
-        body = gzip.compress(("\n".join(lines) + "\n").encode())
-        (run / "chunks" / f"chunk-{k:04d}.jsonl.gz").write_bytes(body)
-        store.put(f"{B2_ROOT}/{name}/chunks/chunk-{k:04d}.jsonl.gz", body)
-        n_chunks = k + 1
-        log.info("prepared chunk %d (%d requests, %.1f MB gz)", k, len(part), len(body) / 1e6)
-    idx = pd.DataFrame(index, columns=["accession", "cik", "acceptance_et", "session", "chars", "truncated", "chunk"])
-    idx.to_parquet(run / "index.parquet")
+    ids = ue.identities([int(c) for c in sel.cik.unique()])
+    index, chars_in, futures, k, buf = [], 0, [], 0, []
+
+    def drain(n_keep: int):
+        nonlocal chars_in
+        while len(futures) > n_keep:
+            kk, idx, ch = futures.pop(0).result()
+            index.extend(idx)
+            chars_in += ch
+            log.info("prepared chunk %d (%d requests)", kk, len(idx))
+
+    with ProcessPoolExecutor(max_workers=workers) as pool, session(read_only=True) as con:
+        cur = con.execute("""SELECT accession, cik, text FROM us_filing_docs
+                             WHERE item_group = 'earnings' AND status = 'ok' AND chars >= 800""")
+        while True:
+            rows = cur.fetchmany(5000)
+            buf.extend(r for r in rows if r[0] in wanted)
+            while len(buf) >= CHUNK or (not rows and buf):
+                part, buf = buf[:CHUNK], buf[CHUNK:]
+                sub = {c: ids[c] for c in {int(r[1]) for r in part} if c in ids}
+                futures.append(pool.submit(_prep_chunk, name, k, part, sub, str(run)))
+                k += 1
+                drain(workers * 2)              # bounds memory: at most ~8 chunks of text in hand
+            if not rows:
+                break
+        drain(0)
+    idx = pd.DataFrame(index, columns=["accession", "truncated", "chunk"]).merge(sel, on="accession")
+    assert len(idx) == len(sel), f"{len(sel) - len(idx)} selected releases were not prepared"
+    idx.sort_values(["chunk", "accession"]).to_parquet(run / "index.parquet")
     est = estimate(chars_in, len(idx), ratio)
     meta = {"prompt_version": ue.PROMPT_VERSION, "model": ue.llm_cfg()["model"], "n": len(idx),
-            "chunks": n_chunks, "chunk_size": CHUNK, "truncated": int(idx.truncated.sum()),
+            "chunks": k, "chunk_size": CHUNK, "truncated": int(idx.truncated.sum()),
             "chars_per_token": round(ratio, 3), "created": datetime.now().isoformat(), "estimate": est,
             "selection": "earnings, chars>=800, pre_market/after_close, priced on the date"}
     (run / "run.json").write_text(json.dumps(meta, indent=1))
+    store = get_store()
     for f in ("run.json", "index.parquet"):
         store.put(f"{B2_ROOT}/{name}/{f}", (run / f).read_bytes())
     log.info("prepared %s: %d requests in %d chunks, %d truncated; estimate $%.2f (£%.2f)",
-             name, len(idx), n_chunks, meta["truncated"], est["usd_est"], est["gbp_est"])
+             name, len(idx), k, meta["truncated"], est["usd_est"], est["gbp_est"])
     return run
 
 
