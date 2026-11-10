@@ -31,15 +31,19 @@ ARMS = {
     # OpenAI's own batch format isn't enabled for this gateway team (403), so nano also goes through the
     # Messages format; its reasoning effort is passed as an OpenAI provider option (checked: 263 output
     # tokens instead of ~4,000 with the default, same answer).
+    # GPT-6 Luna directly through OpenAI's Batch API (the gateway's free tier blocks it). Same per-token
+    # batch price as Haiku, but OpenAI's tokenizer counted our releases ~40% shorter.
+    "luna": {"model": "gpt-6-luna", "format": "chat", "base_url": "https://api.openai.com/v1",
+             "price": (0.05, 0.005, 0.25), "reasoning_effort": "minimal", "max_body": 150_000_000},
     "nano": {"model": "openai/gpt-5-nano", "format": "messages", "price": (0.025, 0.0025, 0.20),
              "extra": {"providerOptions": {"openai": {"reasoningEffort": "minimal"}}}},
 }
 
 
-def _groups(lines: list[str]) -> list[list[str]]:
+def _groups(lines: list[str], max_body: int = MAX_BODY) -> list[list[str]]:
     out, cur, size = [], [], 0
     for line in lines:
-        if cur and size + len(line) > MAX_BODY:
+        if cur and size + len(line) > max_body:
             out.append(cur)
             cur, size = [], 0
         cur.append(line)
@@ -77,13 +81,13 @@ def submit(arm: str, base: Path, run: Path) -> list[str]:
             log.info("%s: sent group %d (%d requests) as %s", arm, k, len(g), b.id)
     else:
         import openai
-        client = openai.OpenAI(api_key="proxy-injected", base_url=GATEWAY + "/v1")
+        client = openai.OpenAI(api_key="proxy-injected", base_url=a.get("base_url", GATEWAY + "/v1"))
         lines = [json.dumps({"custom_id": r["custom_id"], "method": "POST", "url": "/v1/chat/completions", "body": {
             "model": a["model"], "max_completion_tokens": 4000, "reasoning_effort": a["reasoning_effort"],
             "messages": [{"role": "system", "content": r["system"]}, {"role": "user", "content": r["text"]}],
             "response_format": {"type": "json_schema", "json_schema": {"name": "earnings", "strict": True,
                                                                         "schema": r["schema"]}}}}) for r in reqs]
-        for k, g in enumerate(_groups(lines)):
+        for k, g in enumerate(_groups(lines, a.get("max_body", MAX_BODY))):
             f = client.files.create(file=(f"{run.name}-{k}.jsonl", io.BytesIO("\n".join(g).encode())),
                                     purpose="batch", extra_headers={"Idempotency-Key": f"{run.name}-{k}-file"})
             b = client.batches.create(input_file_id=f.id, endpoint="/v1/chat/completions", completion_window="24h",
@@ -106,7 +110,7 @@ def collect(arm: str, ids: list[str], poll_s: int = 60) -> list[dict]:
             out += [json.loads(r.to_json(indent=None)) for r in client.messages.batches.results(bid)]
     else:
         import openai
-        client = openai.OpenAI(api_key="proxy-injected", base_url=GATEWAY + "/v1")
+        client = openai.OpenAI(api_key="proxy-injected", base_url=a.get("base_url", GATEWAY + "/v1"))
         for bid in ids:
             while (b := client.batches.retrieve(bid)).status not in ("completed", "failed", "expired", "cancelled"):
                 log.info("%s %s: %s %s", arm, bid, b.status, b.request_counts)
