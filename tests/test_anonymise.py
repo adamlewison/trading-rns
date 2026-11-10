@@ -55,3 +55,9 @@ def test_acronyms_and_filenames():
 def test_unknown_old_ticker_with_exchange():
     assert anonymise("Vical (Nasdaq:VICL) and (NYSE: BRK.B)", ["Brickell Biotech"], ["BBI"]) == \
         "Vical (Nasdaq:[TICKER]) and (NYSE: [TICKER])"
+
+
+def test_hyphenated_form_of_a_spaced_name():
+    """2026-11-10: EDGAR says "SHERWIN WILLIAMS CO", the release says "The Sherwin-Williams Company"."""
+    out = anonymise("The Sherwin-Williams Company reports; Sherwin Williams rose.", ["SHERWIN WILLIAMS CO"], ["SHW"])
+    assert "Sherwin" not in out and "Williams" not in out

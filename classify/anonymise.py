@@ -94,8 +94,8 @@ def anonymise(text: str, names: list[str], tickers: list[str]) -> str:
         # possessives and all-caps headings match too; word boundaries so "Apple" leaves "Applebee".
         # One-word names match in any case but must start with a capital, so "MEDALLION" also catches
         # "Medallion" and "CoStar", while "Target" spares "our sales target".
-        if " " in v:
-            pat, flags = re.escape(v), re.IGNORECASE
+        if " " in v:   # "SHERWIN WILLIAMS CO" must also catch "Sherwin-Williams"
+            pat, flags = r"[\s\-]+".join(re.escape(w) for w in v.split(" ")), re.IGNORECASE
         else:
             pat, flags = rf"(?=[A-Z])(?i:{re.escape(v)})", 0
         tail = r"(?:,?\s+(?:Inc|Incorporated|Corp|Corporation|Co|Company|Ltd|Limited|plc|PLC|LLC|L\.P|Holdings|INC|CORP|CORPORATION|COMPANY|HOLDINGS)\.?)*"
