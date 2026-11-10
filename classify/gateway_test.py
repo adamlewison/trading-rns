@@ -34,7 +34,9 @@ ARMS = {
     # GPT-6 Luna directly through OpenAI's Batch API (the gateway's free tier blocks it). Same per-token
     # batch price as Haiku, but OpenAI's tokenizer counted our releases ~40% shorter.
     "luna": {"model": "gpt-6-luna", "format": "chat", "base_url": "https://api.openai.com/v1",
-             "price": (0.05, 0.005, 0.25), "reasoning_effort": "minimal", "max_body": 150_000_000},
+             "price": (0.05, 0.005, 0.25), "reasoning_effort": "none", "max_body": 150_000_000},
+    "luna_low": {"model": "gpt-6-luna", "format": "chat", "base_url": "https://api.openai.com/v1",
+                 "price": (0.05, 0.005, 0.25), "reasoning_effort": "low", "max_body": 150_000_000},
     "nano": {"model": "openai/gpt-5-nano", "format": "messages", "price": (0.025, 0.0025, 0.20),
              "extra": {"providerOptions": {"openai": {"reasoningEffort": "minimal"}}}},
 }
