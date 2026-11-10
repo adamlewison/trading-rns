@@ -45,3 +45,30 @@ def test_parse_results_and_leak_check(tmp_path):
                            "tickers": [json.dumps(["AAPL"]), json.dumps(["MSFT"])]})
     hits = ue.leak_hits(leaks, sample)
     assert hits.set_index("accession").leaked.to_dict() == {"0000320193-20-000010": True, "0000789019-20-000001": False}
+
+
+def test_cache_and_thinking_variants():
+    p = ue.params(ue.SYSTEM, ue.SCHEMA, "x", cache=True, thinking_off=True)
+    assert p["system"][0]["cache_control"] == {"type": "ephemeral"} and ue.system_text(p) == ue.SYSTEM
+    assert p["thinking"] == {"type": "disabled"}
+    assert "thinking" not in ue.params(ue.SYSTEM, ue.SCHEMA, "x")
+
+
+def test_strip_boilerplate_keeps_outlook_with_figures():
+    disclaimer = ("This release contains forward-looking statements within the meaning of the Private Securities "
+                  "Litigation Reform Act of 1995. Such statements involve risks and uncertainties, including demand, "
+                  "competition and other factors described in our filings with the SEC, which could cause actual "
+                  "results to differ materially from those expressed or implied in these forward-looking statements.")
+    outlook = ("Outlook (forward-looking statements): the Company expects fiscal 2026 EPS of 2.10 to 2.25 and revenue "
+               "growth of 4% to 6%, subject to risks and uncertainties described below and in our filings with the "
+               "SEC, including the timing of customer orders and the effect of currency movements on results.")
+    out, removed = ue.strip_boilerplate(f"Revenue rose.\n\n{outlook}\n\n{disclaimer}")
+    assert outlook in out and disclaimer not in out and removed == len(disclaimer)
+
+
+def test_cost_counts_cache_tokens(monkeypatch):
+    monkeypatch.setattr(ue, "llm_cfg", lambda: {"price_in_per_mtok": 0.10, "price_out_per_mtok": 0.50, "batch": True})
+    base = ue.usage_usd({"input": 1_000_000, "output": 0})
+    assert base == pytest.approx(0.05)
+    assert ue.usage_usd({"input": 0, "output": 0, "cache_read": 1_000_000}) == pytest.approx(0.005)
+    assert ue.usage_usd({"input": 0, "output": 0, "cache_write": 1_000_000}) == pytest.approx(0.0625)

@@ -108,15 +108,43 @@ def llm_cfg() -> dict:
     return load_config()["llm"]
 
 
-def params(system: str, schema: dict, text: str) -> dict:
+def params(system: str, schema: dict, text: str, cache: bool = False, thinking_off: bool = False) -> dict:
+    """cache: mark the instructions (identical in every request) for prompt caching, so repeats are
+    billed at ~0.1x. thinking_off: skip the model's short reasoning step (fewer output tokens)."""
     c = llm_cfg()
-    return {
+    p = {
         "model": c["model"],
         "max_tokens": 4000,                         # room for (low-effort) thinking plus the JSON
-        "system": system,
+        "system": [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}] if cache else system,
         "messages": [{"role": "user", "content": f"<release>\n{text}\n</release>"}],
         "output_config": {"effort": c.get("effort", "low"), "format": {"type": "json_schema", "schema": schema}},
     }
+    if thinking_off:
+        p["thinking"] = {"type": "disabled"}        # allowed on Haiku 5.5 at effort <= high
+    return p
+
+
+def system_text(p: dict) -> str:
+    return p["system"] if isinstance(p["system"], str) else "".join(b["text"] for b in p["system"])
+
+
+# Legal "forward-looking statements / safe harbor" disclaimers: ~14% of release text in the pilot,
+# the same wording every quarter and nothing we extract. Only long paragraphs that read like the
+# disclaimer and carry no dollar amounts go (an "Outlook" paragraph with figures stays).
+_BOILER = re.compile(r"Private Securities Litigation Reform Act|safe[- ]harbou?r|forward[- ]looking (?:statements?|information)", re.I)
+_RISK = re.compile(r"\brisks?\b|uncertaint", re.I)
+_MONEY = re.compile(r"\$\s?\d|\d\s?%|\b\d+(?:\.\d+)?\s?(?:to|-|–)\s?\$?\d")   # amounts, percentages, ranges
+VARIANTS = {"": {}, "A": {"cache": True, "strip": True}, "B": {"cache": True, "strip": True, "thinking_off": True}}
+
+
+def strip_boilerplate(text: str) -> tuple[str, int]:
+    parts = re.split(r"(\n\s*\n)", text)
+    removed = 0
+    for i, para in enumerate(parts):
+        if len(para) > 300 and _BOILER.search(para) and _RISK.search(para) and not _MONEY.search(para):
+            removed += len(para)
+            parts[i] = "[legal disclaimer removed]"
+    return "".join(parts), removed
 
 
 # ---------------------------------------------------------------- prepare (no API calls)
@@ -160,7 +188,7 @@ def identities(ciks: list[int]) -> dict[int, tuple[list[str], list[str]]]:
 def estimate_cost(requests: list[dict]) -> dict:
     """Pre-run estimate. Output (incl. thinking) is a guess until the pilot measures it."""
     c = llm_cfg()
-    in_tok = sum(len(r["params"]["system"]) + len(r["params"]["messages"][0]["content"]) for r in requests) / CHARS_PER_TOKEN
+    in_tok = sum(len(system_text(r["params"])) + len(r["params"]["messages"][0]["content"]) for r in requests) / CHARS_PER_TOKEN
     out_tok = len(requests) * 700
     disc = 0.5 if c.get("batch", True) else 1.0
     usd = (in_tok * c["price_in_per_mtok"] + out_tok * c["price_out_per_mtok"]) / 1e6 * disc
@@ -177,22 +205,28 @@ def sample_from(run: Path) -> pd.DataFrame:
     return df.set_index("accession").loc[acc].reset_index()
 
 
-def prepare(n: int, n_leak: int, seed: int = 7, reuse: Path | None = None) -> Path:
+def prepare(n: int, n_leak: int, seed: int = 7, reuse: Path | None = None, variant: str = "") -> Path:
+    v = VARIANTS[variant]
     df = sample_from(reuse) if reuse else sample(n, seed)
+    stripped = 0
     ids = identities([int(c) for c in df.cik.unique()])
     texts, truncated = [], []
     for row in df.itertuples():
         names, tickers = ids.get(int(row.cik), ([], []))
         t = anonymise(row.text, names, tickers)
+        if v.get("strip"):
+            t, k = strip_boilerplate(t)
+            stripped += k
         truncated.append(len(t) > MAX_CHARS)
         texts.append(t[:MAX_CHARS] + ("\n[... release truncated ...]" if len(t) > MAX_CHARS else ""))
     df["anon_text"], df["truncated"] = texts, truncated
     df["names"] = [json.dumps(ids.get(int(c), ([], []))[0]) for c in df.cik]
     df["tickers"] = [json.dumps(ids.get(int(c), ([], []))[1]) for c in df.cik]
 
-    run = RUNS_DIR / f"us-earnings-pilot-{PROMPT_VERSION[-2:]}-{datetime.now():%Y%m%dT%H%M%S}"
+    run = RUNS_DIR / f"us-earnings-pilot-{PROMPT_VERSION[-2:]}{variant}-{datetime.now():%Y%m%dT%H%M%S}"
     run.mkdir(parents=True)
-    reqs = [{"custom_id": f"e-{a}", "params": params(SYSTEM, SCHEMA, t)}
+    pv = {k: v[k] for k in ("cache", "thinking_off") if k in v}
+    reqs = [{"custom_id": f"e-{a}", "params": params(SYSTEM, SCHEMA, t, **pv)}
             for a, t in zip(df.accession, df.anon_text)]
     leak = df.sample(min(n_leak, len(df)), random_state=seed)
     reqs += [{"custom_id": f"l-{a}", "params": params(LEAK_SYSTEM, LEAK_SCHEMA, t)}
@@ -203,7 +237,7 @@ def prepare(n: int, n_leak: int, seed: int = 7, reuse: Path | None = None) -> Pa
     df.drop(columns=["text"]).to_parquet(run / "sample.parquet")
     est = estimate_cost(reqs)
     meta = {"prompt_version": PROMPT_VERSION, "model": llm_cfg()["model"], "seed": seed, "n": len(df),
-            "sample_from": reuse.name if reuse else None,
+            "sample_from": reuse.name if reuse else None, "variant": variant, "stripped_chars": stripped,
             "n_leak": len(leak), "truncated": int(sum(truncated)), "created": datetime.now().isoformat(),
             "estimate": est}
     (run / "run.json").write_text(json.dumps(meta, indent=1))
@@ -294,7 +328,8 @@ def backup_run(run: Path) -> None:
 # ---------------------------------------------------------------- report (no API calls)
 def parse_results(run: Path) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
     labels, leaks = [], []
-    usage = {"input": 0, "output": 0, "succeeded": 0, "errored": 0, "bad_json": 0, "stops": {}}
+    usage = {"input": 0, "output": 0, "cache_write": 0, "cache_read": 0, "succeeded": 0, "errored": 0,
+             "bad_json": 0, "stops": {}}
     for line in (run / "results.jsonl").open():
         r = json.loads(line)
         cid, res = r["custom_id"], r["result"]
@@ -306,6 +341,8 @@ def parse_results(run: Path) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
         usage["succeeded"] += 1
         usage["input"] += msg["usage"]["input_tokens"]
         usage["output"] += msg["usage"]["output_tokens"]
+        usage["cache_write"] += msg["usage"].get("cache_creation_input_tokens") or 0
+        usage["cache_read"] += msg["usage"].get("cache_read_input_tokens") or 0
         usage["stops"][msg["stop_reason"]] = usage["stops"].get(msg["stop_reason"], 0) + 1
         text = next((b["text"] for b in msg["content"] if b["type"] == "text"), None)
         try:
@@ -317,6 +354,14 @@ def parse_results(run: Path) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
             continue
         (labels if cid.startswith("e-") else leaks).append({"accession": acc, **data})
     return pd.DataFrame(labels), pd.DataFrame(leaks), usage
+
+
+def usage_usd(u: dict) -> float:
+    """Batch price (half) incl. cache writes (1.25x input) and cache reads (0.1x input)."""
+    c = llm_cfg()
+    disc = 0.5 if c.get("batch", True) else 1.0
+    inp = u["input"] + 1.25 * u.get("cache_write", 0) + 0.1 * u.get("cache_read", 0)
+    return (inp * c["price_in_per_mtok"] + u["output"] * c["price_out_per_mtok"]) / 1e6 * disc
 
 
 def _norm(s: str) -> str:
@@ -371,13 +416,13 @@ def report(run: Path) -> str:
     sample_df = pd.read_parquet(run / "sample.parquet")
     labels, leaks, u = parse_results(run)
     labels.to_parquet(run / "labels.parquet")
-    disc = 0.5 if c.get("batch", True) else 1.0
-    usd = (u["input"] * c["price_in_per_mtok"] + u["output"] * c["price_out_per_mtok"]) / 1e6 * disc
+    usd = usage_usd(u)
     n_e = max(len(labels), 1)
     lines = [f"# {run.name}  ({meta['prompt_version']}, {meta['model']})",
              f"results: {u['succeeded']} ok, {u['errored']} errored, {u['bad_json']} unparseable; stop reasons {u['stops']}",
-             f"tokens: {u['input']:,} in, {u['output']:,} out (incl. thinking) -> ${usd:.3f} (£{usd * c['usd_gbp']:.3f}); "
-             f"per release ~{u['input'] / max(u['succeeded'], 1):,.0f} in / {u['output'] / max(u['succeeded'], 1):,.0f} out",
+             f"tokens: {u['input']:,} in + {u['cache_write']:,} cache-write + {u['cache_read']:,} cache-read, "
+             f"{u['output']:,} out (incl. thinking) -> ${usd:.3f} (£{usd * c['usd_gbp']:.3f}); "
+             f"per release ~{(u['input'] + u['cache_write'] + u['cache_read']) / max(u['succeeded'], 1):,.0f} in / {u['output'] / max(u['succeeded'], 1):,.0f} out",
              f"truncated releases: {meta['truncated']} of {meta['n']}", ""]
     if len(labels):
         per_doc_usd = usd / max(u["succeeded"], 1)
@@ -423,6 +468,7 @@ def main() -> None:
     p = sub.add_parser("prepare"); p.add_argument("--n", type=int, default=None); p.add_argument("--leak", type=int, default=50)
     p.add_argument("--seed", type=int, default=7)
     p.add_argument("--reuse", help="run folder whose sample to reuse (compare prompt versions)")
+    p.add_argument("--variant", default="", choices=list(VARIANTS), help="A: cache + strip disclaimers; B: A + no thinking")
     r = sub.add_parser("run-remote"); r.add_argument("name"); r.add_argument("--yes-spend", action="store_true")
     q = sub.add_parser("pull"); q.add_argument("name")
     for name in ("submit", "fetch", "report", "backup"):
@@ -431,7 +477,7 @@ def main() -> None:
             s.add_argument("--yes-spend", action="store_true")
     a = ap.parse_args()
     if a.cmd == "prepare":
-        print(prepare(a.n or int(llm_cfg()["pilot_size"]), a.leak, a.seed, Path(a.reuse) if a.reuse else None))
+        print(prepare(a.n or int(llm_cfg()["pilot_size"]), a.leak, a.seed, Path(a.reuse) if a.reuse else None, a.variant))
         return
     if a.cmd == "run-remote":                       # on the droplet
         run = pull_run(a.name)
