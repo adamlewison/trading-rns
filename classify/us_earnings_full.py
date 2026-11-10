@@ -38,8 +38,6 @@ MAX_IN_FLIGHT = 10      # batches waiting at Anthropic at once (~20k requests)
 POLL_S = 120
 B2_ROOT = "trading-rns/llm/v1"
 # measured on pilot v2 (500 releases, same prompt and 25k-char cap): input chars per token, output per release
-PILOT_CHARS_PER_TOKEN = None    # filled from the pilot run at prepare time
-PILOT_OUT_TOKENS = 472
 
 
 def select() -> pd.DataFrame:
@@ -58,26 +56,33 @@ def select() -> pd.DataFrame:
             ORDER BY d.acceptance_et, d.accession""").df()
 
 
-def _pilot_ratio() -> float:
-    """Input chars per token, measured on the v2 pilot (system prompt + release text)."""
-    run = ue.RUNS_DIR / "us-earnings-pilot-v2-20261109T233820"
-    chars = sum(len(r["params"]["system"]) + len(r["params"]["messages"][0]["content"])
+PILOT_RUN = "us-earnings-pilot-v4A-20261110T121705"   # same prompt and settings, 500 releases
+
+
+def _pilot_model() -> dict:
+    """Measured on the pilot with the same prompt/settings: release-text chars per uncached input
+    token, and per-release cache-read, cache-write and output tokens."""
+    run = ue.RUNS_DIR / PILOT_RUN
+    chars = sum(len(r["params"]["messages"][0]["content"])
                 for r in map(json.loads, (run / "requests.jsonl").open()) if r["custom_id"].startswith("e-"))
     _, _, u = ue.parse_results(run)
-    return chars / u["input"]
+    n = u["succeeded"]
+    return {"chars_per_token": chars / u["input"], "cache_read": u["cache_read"] / n,
+            "cache_write": u["cache_write"] / n, "output": u["output"] / n}
 
 
-def estimate(chars_in: int, n: int, ratio: float) -> dict:
-    c = ue.llm_cfg()
-    in_tok, out_tok = chars_in / ratio, n * PILOT_OUT_TOKENS
-    usd = (in_tok * c["price_in_per_mtok"] + out_tok * c["price_out_per_mtok"]) / 1e6 * 0.5   # batch: half price
-    return {"requests": n, "input_tokens_est": int(in_tok), "output_tokens_est": out_tok,
-            "usd_est": round(usd, 2), "gbp_est": round(usd * c["usd_gbp"], 2)}
+def estimate(chars_in: int, n: int, m: dict) -> dict:
+    """chars_in: release text only (the instructions are the cached part)."""
+    u = {"input": chars_in / m["chars_per_token"], "cache_read": n * m["cache_read"],
+         "cache_write": n * m["cache_write"], "output": n * m["output"]}
+    usd = ue.usage_usd(u)
+    return {"requests": n, **{f"{k}_tokens_est": int(v) for k, v in u.items()},
+            "usd_est": round(usd, 2), "gbp_est": round(usd * ue.llm_cfg()["usd_gbp"], 2)}
 
 
-def cost_gbp(input_tokens: int, output_tokens: int) -> float:
-    c = ue.llm_cfg()
-    return (input_tokens * c["price_in_per_mtok"] + output_tokens * c["price_out_per_mtok"]) / 1e6 * 0.5 * c["usd_gbp"]
+def cost_gbp(input_tokens: int, output_tokens: int, cache_write: int = 0, cache_read: int = 0) -> float:
+    u = {"input": input_tokens, "output": output_tokens, "cache_write": cache_write, "cache_read": cache_read}
+    return ue.usage_usd(u) * ue.llm_cfg()["usd_gbp"]
 
 
 def _prep_chunk(name: str, k: int, rows: list[tuple], ids: dict, run_dir: str) -> tuple[int, list, int]:
@@ -86,11 +91,11 @@ def _prep_chunk(name: str, k: int, rows: list[tuple], ids: dict, run_dir: str) -
     lines, index, chars_in = [], [], 0
     for acc, cik, text in rows:
         names, tickers = ids.get(int(cik), ([], []))
-        t = anonymise(text, names, tickers)
+        t, _ = ue.strip_boilerplate(anonymise(text, names, tickers))   # settings "A" of the cost test
         cut = len(t) > ue.MAX_CHARS
         t = t[:ue.MAX_CHARS] + ("\n[... release truncated ...]" if cut else "")
-        p = ue.params(ue.SYSTEM, ue.SCHEMA, t)
-        chars_in += len(p["system"]) + len(p["messages"][0]["content"])
+        p = ue.params(ue.SYSTEM, ue.SCHEMA, t, cache=True)
+        chars_in += len(p["messages"][0]["content"])
         lines.append(json.dumps({"custom_id": f"e-{acc}", "params": p}))
         index.append((acc, cut, k))
     body = gzip.compress(("\n".join(lines) + "\n").encode())
@@ -108,7 +113,7 @@ def prepare(limit: int | None = None, workers: int = 4) -> Path:
     if limit:
         sel = sel.head(limit)
     wanted = set(sel.accession)
-    ratio = _pilot_ratio()
+    model = _pilot_model()
     name = f"us-earnings-full-{ue.PROMPT_VERSION[-2:]}-{datetime.now():%Y%m%dT%H%M%S}"
     run = ue.RUNS_DIR / name
     (run / "chunks").mkdir(parents=True)
@@ -141,10 +146,10 @@ def prepare(limit: int | None = None, workers: int = 4) -> Path:
     idx = pd.DataFrame(index, columns=["accession", "truncated", "chunk"]).merge(sel, on="accession")
     assert len(idx) == len(sel), f"{len(sel) - len(idx)} selected releases were not prepared"
     idx.sort_values(["chunk", "accession"]).to_parquet(run / "index.parquet")
-    est = estimate(chars_in, len(idx), ratio)
+    est = estimate(chars_in, len(idx), model)
     meta = {"prompt_version": ue.PROMPT_VERSION, "model": ue.llm_cfg()["model"], "n": len(idx),
             "chunks": k, "chunk_size": CHUNK, "truncated": int(idx.truncated.sum()),
-            "chars_per_token": round(ratio, 3), "created": datetime.now().isoformat(), "estimate": est,
+            "pilot": PILOT_RUN, "settings": "prompt caching + disclaimers stripped", "created": datetime.now().isoformat(), "estimate": est,
             "selection": "earnings, chars>=800, pre_market/after_close, priced on the date"}
     (run / "run.json").write_text(json.dumps(meta, indent=1))
     store = get_store()
@@ -169,21 +174,27 @@ def _save_state(store, name: str, state: dict) -> None:
 
 def _collect(client, store, name: str, k: str, st: dict, state: dict) -> None:
     """Raw results of one ended batch to B2 (exactly as returned), then the usage into the state."""
-    lines, inp, out, ok, err = [], 0, 0, 0, 0
+    lines, inp, out, cw, cr, ok, err = [], 0, 0, 0, 0, 0, 0
     for r in client.messages.batches.results(st["batch_id"]):
         lines.append(r.to_json(indent=None))
         if r.result.type == "succeeded":
             ok += 1
-            inp += r.result.message.usage.input_tokens
-            out += r.result.message.usage.output_tokens
+            us = r.result.message.usage
+            inp += us.input_tokens
+            out += us.output_tokens
+            cw += getattr(us, "cache_creation_input_tokens", 0) or 0
+            cr += getattr(us, "cache_read_input_tokens", 0) or 0
         else:
             err += 1
     store.put(f"{B2_ROOT}/{name}/results/{k}.jsonl.gz", gzip.compress(("\n".join(lines) + "\n").encode()))
     st.update(status="collected", collected=datetime.now().isoformat(), succeeded=ok, errored=err,
-              input_tokens=inp, output_tokens=out, cost_gbp=round(cost_gbp(inp, out), 4))
+              input_tokens=inp, output_tokens=out, cache_write=cw, cache_read=cr,
+              cost_gbp=round(cost_gbp(inp, out, cw, cr), 4))
     state["spent_gbp"] = round(state["spent_gbp"] + st["cost_gbp"], 4)
     state["input_tokens"] += inp
     state["output_tokens"] += out
+    state["cache_write"] = state.get("cache_write", 0) + cw
+    state["cache_read"] = state.get("cache_read", 0) + cr
     state["succeeded"] += ok
     state["errored"] += err
     log.info("collected %s: %d ok, %d errored, £%.3f (total £%.2f)", k, ok, err, st["cost_gbp"], state["spent_gbp"])
@@ -210,7 +221,9 @@ def run(name: str, max_gbp: float, client=None, store=None, poll_s: int = POLL_S
             raise SystemExit(f"test call stopped with {test.stop_reason}; not sending anything")
         json.loads(ue._json_text(test))
         state["test_call"] = True
-        state["spent_gbp"] = round(state["spent_gbp"] + cost_gbp(test.usage.input_tokens, test.usage.output_tokens) * 2, 4)
+        state["spent_gbp"] = round(state["spent_gbp"] + cost_gbp(test.usage.input_tokens, test.usage.output_tokens,
+                                                            getattr(test.usage, "cache_creation_input_tokens", 0) or 0,
+                                                            getattr(test.usage, "cache_read_input_tokens", 0) or 0) * 2, 4)
         _save_state(store, name, state)
         log.info("test call ok (%d in / %d out tokens)", test.usage.input_tokens, test.usage.output_tokens)
 
