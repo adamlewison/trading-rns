@@ -53,8 +53,13 @@ def _store():
 
 
 def _client():
+    """On the droplet the key comes from .env (OPENAI_API_KEY); in a cloud session the network proxy
+    injects it, so a placeholder is enough."""
+    import os
     import openai
-    return openai.OpenAI(api_key="proxy-injected")
+    from core.config import load_config
+    load_config()                                   # loads .env
+    return openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY") or "proxy-injected")
 
 
 def to_openai(line: str) -> str:
@@ -192,10 +197,12 @@ def _adopt(client, st: dict) -> None:
 
 def run(max_gbp: float = 55.0, client=None, store=None, poll_s: int = POLL_S, once: bool = False) -> dict:
     store, client = store or _store(), client or _client()
-    est = estimate(store)
+    st = _load(store)
+    # the estimate is computed once (it needs the pilot files, which only the cloud session has) and
+    # kept in the state, so the droplet can resume without them
+    est = st.get("estimate") or estimate(store)
     if est["gbp_est"] > max_gbp:
         raise SystemExit(f"estimate £{est['gbp_est']:.2f} is above the cap £{max_gbp:.2f}: not starting")
-    st = _load(store)
     if not st["jobs"]:
         st["jobs"] = _plan(store, est)
         st["estimate"], st["max_in_flight"] = est, MAX_IN_FLIGHT
