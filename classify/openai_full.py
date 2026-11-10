@@ -14,8 +14,8 @@ Safety:
   batch OpenAI has for this run (matched by metadata) but the state lacks is adopted, not re-sent;
 - spending cap: refuses to start if the estimate is above it, and stops sending once measured spend
   plus the estimate of what is in flight would pass it;
-- stragglers: a batch stuck at >=99% for STRAGGLER_H hours is cancelled (finished requests are kept and
-  billed, the rest are re-sent in a small retry batch)."""
+- stalls and stragglers: a batch whose progress hasn't moved for STALL_H, or that sits at >=99% for
+  STRAGGLER_H, is cancelled (finished requests are kept and billed, the rest re-sent in a retry batch)."""
 from __future__ import annotations
 
 import argparse
@@ -35,10 +35,13 @@ SOURCE = "us-earnings-full-v4-20261110T123421"        # prepared chunks (Haiku f
 MODEL, EFFORT = "gpt-6-luna", "none"
 PRICE = (0.05, 0.005, 0.25)                           # batch $/MTok: input, cached input, output
 PILOT = "us-earnings-pilot-v4A-20261110T121705-luna-20261110T145454"
-MAX_IN_FLIGHT = 6      # starting point; lowered automatically when OpenAI's batch queue limit is hit
+MAX_IN_FLIGHT = 12     # starting point; lowered automatically when OpenAI's batch queue limit is hit
 JOB_SIZE = 500         # requests per batch (~3M tokens), so a new account's queue limit isn't exceeded
 STRAGGLER_H = 3.0
 STRAGGLER_DONE = 0.99
+STALL_H = 1.0          # a batch whose completed count hasn't moved for this long is cancelled and its
+                       # unfinished requests re-sent: OpenAI often stops mid-batch for hours (seen 2026-11-10:
+                       # four batches stuck at ~45% for over an hour), while fresh batches start quickly
 POLL_S = 120
 TERMINAL = ("completed", "failed", "expired", "cancelled")
 
@@ -160,7 +163,7 @@ def _collect(client, store, st: dict, job: str, b) -> None:
     # anything not returned (cancelled straggler, expired, failed request) goes into one retry job
     want = set(j["ids"])
     missing = sorted(want - {r["custom_id"] for r in ok})
-    if missing and j.get("retries", 0) < 2:
+    if missing and j.get("retries", 0) < 6:
         rid = f"{job.split('-retry')[0]}-retry{j.get('retries', 0) + 1}"
         st["jobs"][rid] = {"chunk": j["chunk"], "ids": missing, "status": "queued", "retries": j.get("retries", 0) + 1}
         log.info("%s: %d requests not returned, queued as %s", job, len(missing), rid)
@@ -209,7 +212,10 @@ def run(max_gbp: float = 55.0, client=None, store=None, poll_s: int = POLL_S, on
         _save(store, st)
     _adopt(client, st)
     per_req, capped = est["gbp_per_release"], False
+    if not any(j.get("failures") for j in st["jobs"].values()):   # no queue-limit rejections so far
+        st["max_in_flight"] = max(st.get("max_in_flight", MAX_IN_FLIGHT), MAX_IN_FLIGHT)
     while True:
+        changed = False
         for job, j in list(st["jobs"].items()):
             if j["status"] != "sent":
                 continue
@@ -228,14 +234,25 @@ def run(max_gbp: float = 55.0, client=None, store=None, poll_s: int = POLL_S, on
                 continue
             if b.status in TERMINAL:
                 _collect(client, store, st, job, b)
-            elif b.status == "in_progress" and b.request_counts and b.request_counts.total:
-                done = b.request_counts.completed / b.request_counts.total
-                age = datetime.now() - datetime.fromisoformat(j["sent"])
-                if done >= STRAGGLER_DONE and age > timedelta(hours=STRAGGLER_H) and not j.get("cancel_asked"):
+            elif b.status in ("validating", "in_progress", "finalizing") and b.request_counts and b.request_counts.total:
+                now = datetime.now()
+                comp = b.request_counts.completed
+                done = comp / b.request_counts.total
+                age = now - datetime.fromisoformat(j["sent"])
+                if (j.get("progress") or {}).get("completed") != comp:
+                    j["progress"] = {"completed": comp, "at": now.isoformat()}
+                    changed = True
+                still = now - datetime.fromisoformat(j["progress"]["at"])
+                straggling = done >= STRAGGLER_DONE and age > timedelta(hours=STRAGGLER_H)
+                stalled = b.status == "in_progress" and still > timedelta(hours=STALL_H) and age > timedelta(hours=STALL_H)
+                if (straggling or stalled) and not j.get("cancel_asked"):
                     client.batches.cancel(j["batch_id"])
                     j["cancel_asked"] = True
-                    _save(store, st)
-                    log.info("%s: %.1f%% done after %.1fh, cancelling the stragglers", job, 100 * done, age.total_seconds() / 3600)
+                    changed = True
+                    log.info("%s: %d/%d done, no progress for %.1fh; cancelling and re-sending the rest",
+                             job, comp, b.request_counts.total, still.total_seconds() / 3600)
+        if changed:
+            _save(store, st)
         in_flight = [k for k, j in st["jobs"].items() if j["status"] == "sent"]
         paused = st.get("pause_until") and datetime.now() < datetime.fromisoformat(st["pause_until"])
         for job, j in st["jobs"].items():

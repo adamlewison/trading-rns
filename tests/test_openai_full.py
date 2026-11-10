@@ -61,12 +61,11 @@ class FakeOpenAI:
     def _retrieve(self, bid):
         b = self.batches_[bid]
         self.polls[bid] = self.polls.get(bid, 0) + 1
-        if b.status == "in_progress" and self.polls[bid] >= 2:
-            if self.hold and len(b.reqs) > 1:
-                b.request_counts.completed = len(b.reqs) - 1
-            else:
-                b.status = "completed"
-                self._finish(b, len(b.reqs))
+        if b.status == "in_progress" and self.hold and len(b.reqs) > 1:
+            b.request_counts.completed = len(b.reqs) - 1       # stops one short, from the first look
+        elif b.status == "in_progress" and self.polls[bid] >= (1 if len(b.reqs) == 1 else 2):
+            b.status = "completed"
+            self._finish(b, len(b.reqs))
         return b
 
     def _cancel(self, bid):
@@ -147,3 +146,17 @@ def test_queue_limit_rejection_is_retried_with_fewer_in_flight(tmp_path, monkeyp
     of._save(store, st)
     st = of.run(max_gbp=1.0, client=client, store=store, poll_s=0)
     assert st["succeeded"] == 6 and st["finished"]
+
+
+def test_stalled_batch_is_cancelled_and_rest_resent(tmp_path, monkeypatch):
+    """2026-11-10: OpenAI batches stopped at ~45% for over an hour. A batch whose progress doesn't
+    move for STALL_H is cancelled; finished requests are kept, the rest go out in a retry batch."""
+    store, client = _setup(tmp_path, chunks=1, size=4), FakeOpenAI(hold=True)   # stops at 3 of 4
+    monkeypatch.setattr(of, "estimate", lambda store=None: {"chunks": 1, "chunk_size": 4, "gbp_per_release": 0.001, "gbp_est": 0.004})
+    monkeypatch.setattr(of, "JOB_SIZE", 4)
+    monkeypatch.setattr(of, "STALL_H", -1.0)        # any time without progress counts as a stall
+    st = of.run(max_gbp=1.0, client=client, store=store, poll_s=0)
+    assert st["succeeded"] == 4 and st["finished"]
+    assert "chunk-0000-p0-retry1" in st["jobs"] and len(st["jobs"]["chunk-0000-p0-retry1"]["ids"]) == 1
+    sent = [r["custom_id"] for b in client.batches_.values() for r in b.reqs]
+    assert len(sent) == 5 and len(set(sent)) == 4    # only the unfinished one was sent again
