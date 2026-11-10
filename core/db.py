@@ -14,17 +14,18 @@ def connect(db, schema: str, read_only: bool = False, wait_s: float = 600,
     connections (see `session`), and we wait for the lock instead of crashing. On a writable
     connection the market's schema (CREATE TABLE IF NOT EXISTS ...) is applied first."""
     path = db
+    # caps passed at open time, so they also hold while DuckDB replays a leftover WAL
+    cfg = ({"memory_limit": memory_limit, "threads": 1, "preserve_insertion_order": False}
+           if memory_limit else {})
     deadline = time.monotonic() + wait_s
     while True:
         try:
-            con = duckdb.connect(str(path), read_only=read_only)
+            con = duckdb.connect(str(path), read_only=read_only, config=cfg)
             break
         except duckdb.IOException as e:
             if "lock" not in str(e).lower() or time.monotonic() > deadline:
                 raise
             time.sleep(1.0)
-    if memory_limit:   # the droplet has 1GB shared by several processes; DuckDB's default is 80% of RAM
-        con.execute(f"SET memory_limit='{memory_limit}'; SET threads=1; SET preserve_insertion_order=false")
     if not read_only:
         con.execute(schema)
     return con
