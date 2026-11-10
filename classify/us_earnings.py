@@ -31,9 +31,10 @@ from ingest.us.common import session
 
 log = get_logger("llm")
 
-PROMPT_VERSION = "us-earnings-v2"
+PROMPT_VERSION = "us-earnings-v3"
 # v1 (pilot 2026-11-09): 40k chars, guidance as one label, events without evidence. v2: shorter input,
-# guidance figures + only an explicitly stated change, each event backed by a quote.
+# guidance figures + only an explicitly stated change, each event backed by a quote. v3: always the latest
+# quarter (year-end releases gave Q4 in one run and the full year in another, ~5% of releases).
 MAX_CHARS = 25_000          # longer releases are cut here (flagged); the headline numbers come first
 CHARS_PER_TOKEN = 2.4       # rough, for the estimate before any API call; the report gives the real count
 RUNS_DIR = ROOT / "data" / "llm"
@@ -47,6 +48,10 @@ Rules:
 - Numbers: copy them from the text, never compute or estimate. Money in millions of the reporting
   currency (e.g. "$1.2 billion" -> 1200, "$350,000" -> 0.35); per-share amounts as written; losses negative.
   Use null when the text doesn't state the number.
+- Period: report the most recent QUARTER. For a year-end release that shows both the fourth quarter and
+  the full year, use the fourth-quarter figures (fiscal_period "Q4"). Use full-year figures (fiscal_period
+  "FY") only if the release gives no figures for the last quarter. All numbers you report, including
+  prior_year, must be for that same period.
 - "prior_year" means the same period one year earlier, as shown in the release.
 - GAAP diluted EPS and adjusted (non-GAAP) EPS are different fields; don't put one in the other.
 - vs_consensus: only if the text itself compares results with analyst expectations; otherwise not_mentioned.
