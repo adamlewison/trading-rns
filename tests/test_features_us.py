@@ -34,3 +34,20 @@ def test_stop_exit_holds_until_stop_or_end():
     assert stop_exit(100, o, l, c, -0.08, 20) == (c[-1] / 100 - 1, 20)
     l2 = [95] * 5 + [91] + [95] * 14
     assert stop_exit(100, o, l2, c, -0.08, 20) == (-0.08, 6)
+
+
+def test_q4_eps_is_year_minus_three_quarters_and_first_filed_wins():
+    import duckdb
+    from features.us_earnings import eps_quarters
+    con = duckdb.connect()
+    con.execute("""CREATE TABLE us_facts (cik BIGINT, taxonomy VARCHAR, concept VARCHAR, unit VARCHAR, val DOUBLE,
+                   start_date DATE, end_date DATE, fy INT, fp VARCHAR, form VARCHAR, filed DATE, accn VARCHAR, frame VARCHAR)""")
+    rows = [("2023-01-01", "2023-03-31", 1.0, "2023-05-01"), ("2023-04-01", "2023-06-30", 1.1, "2023-08-01"),
+            ("2023-07-01", "2023-09-30", 1.2, "2023-11-01"), ("2023-01-01", "2023-12-31", 4.6, "2024-02-20"),
+            ("2023-01-01", "2023-03-31", 0.9, "2024-05-01")]          # a later restatement of Q1: ignored
+    for s, e, v, f in rows:
+        con.execute("INSERT INTO us_facts VALUES (1,'us-gaap','EarningsPerShareDiluted','USD/shares',?,?,?,2023,'','',?,'','')",
+                    [v, s, e, f])
+    q = eps_quarters(con).set_index("end_date")["eps"]
+    assert q[pd.Timestamp("2023-03-31")] == 1.0
+    assert abs(q[pd.Timestamp("2023-12-31")] - 1.3) < 1e-9          # 4.6 - (1.0 + 1.1 + 1.2)

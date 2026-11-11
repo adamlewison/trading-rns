@@ -193,7 +193,10 @@ def build(limit: int | None = None) -> Path:
         items = con.execute("SELECT accession, items FROM sec_filings WHERE list_contains(?, accession)",
                             [ev.accession.tolist()]).df()
         P = Prices(con, sorted(set(ev.ticker.dropna())) + ["SPY", "IWM"])
-    ev = ev.merge(items, on="accession", how="left")
+        fin = fundamentals(con, ev.dropna(subset=["trade_date"]))
+        ev = ev.merge(items, on="accession", how="left")
+        flags = item_flags(con, ev.dropna(subset=["trade_date"]))
+        hist = eps_history(con, ev)
     rows = []
     for r in ev.itertuples():
         row = {"accession": r.accession}
@@ -206,7 +209,8 @@ def build(limit: int | None = None) -> Path:
             for sym in ("SPY", "IWM"):
                 row.update(_bench(P, sym, r.trade_date, days))
         rows.append(row)
-    out = ev.merge(pd.DataFrame(rows), on="accession", how="left")
+    out = (ev.merge(pd.DataFrame(rows), on="accession", how="left").merge(fin, on="accession", how="left")
+             .merge(flags, on="accession", how="left").merge(hist, on="accession", how="left"))
     for rule in "abcd":
         for sym in ("spy", "iwm"):
             if f"r_{rule}" in out and f"{sym}_{rule}" in out:
@@ -227,6 +231,143 @@ def main() -> None:
     b = sub.add_parser("build"); b.add_argument("--limit", type=int)
     a = ap.parse_args()
     print(build(a.limit))
+
+
+
+# ---------------------------------------------------------------- financials (point in time)
+INSTANT = {"StockholdersEquity": "equity", "CashAndCashEquivalentsAtCarryingValue": "cash", "Assets": "assets",
+           "LongTermDebt": "lt_debt", "EntityCommonStockSharesOutstanding": "shares_out"}
+ANNUAL = {"NetIncomeLoss": "ni", "OperatingIncomeLoss": "op_inc", "Revenues": "rev",
+          "RevenueFromContractWithCustomerExcludingAssessedTax": "rev", "SalesRevenueNet": "rev"}
+
+
+def fundamentals(con, ev: pd.DataFrame) -> pd.DataFrame:
+    """Latest balance-sheet values and the last two fiscal years of income-statement values, using only
+    facts filed before the trade date and, for each period, the first filed value. No price is used:
+    our prices are split-adjusted to today while filings report the share counts of their time, so
+    valuation ratios wait for split histories."""
+    con.register("ev", ev[["accession", "cik", "trade_date"]])
+    con.execute(f"""CREATE OR REPLACE TEMP TABLE ff AS
+        SELECT cik, concept, start_date, end_date, min(filed) AS filed, arg_min(val, filed) AS val,
+               date_diff('day', start_date, end_date) AS dur
+        FROM us_facts
+        WHERE concept IN ({','.join(repr(c) for c in list(INSTANT) + list(ANNUAL))})
+          AND unit IN ('USD', 'shares')
+        GROUP BY ALL""")
+    inst = con.execute(f"""
+        SELECT e.accession, f.concept, arg_max(f.val, f.end_date) AS val, max(f.end_date) AS end_date
+        FROM ev e JOIN ff f ON f.cik = e.cik AND f.filed < e.trade_date
+             AND f.end_date > e.trade_date - INTERVAL 500 DAY
+        WHERE f.start_date IS NULL AND f.concept IN ({','.join(repr(c) for c in INSTANT)})
+        GROUP BY ALL""").df()
+    ann = con.execute(f"""
+        SELECT e.accession, f.concept, arg_max(f.val, f.end_date, 2) AS vals, max(f.end_date) AS end_date
+        FROM ev e JOIN ff f ON f.cik = e.cik AND f.filed < e.trade_date
+             AND f.end_date > e.trade_date - INTERVAL 900 DAY
+        WHERE f.dur BETWEEN 350 AND 380 AND f.concept IN ({','.join(repr(c) for c in ANNUAL)})
+        GROUP BY ALL""").df()
+    out = ev[["accession"]].copy()
+    if len(inst):
+        wide = inst.assign(name=inst.concept.map(INSTANT)).pivot_table(index="accession", columns="name",
+                                                                          values="val", aggfunc="first")
+        out = out.merge(wide, left_on="accession", right_index=True, how="left")
+    if len(ann):
+        ann["name"] = ann.concept.map(ANNUAL)
+        ann["last"] = ann.vals.map(lambda v: v[0] if len(v) else np.nan)
+        ann["prev"] = ann.vals.map(lambda v: v[1] if len(v) > 1 else np.nan)
+        # several revenue concepts: keep the one with the most recent fiscal year
+        ann = ann.sort_values("end_date").drop_duplicates(["accession", "name"], keep="last")
+        last = ann.pivot(index="accession", columns="name", values="last").add_suffix("_fy")
+        prev = ann.pivot(index="accession", columns="name", values="prev").add_suffix("_fy_prev")
+        out = out.merge(last, left_on="accession", right_index=True, how="left") \
+                 .merge(prev, left_on="accession", right_index=True, how="left")
+    f = out
+    with np.errstate(divide="ignore", invalid="ignore"):
+        f["profitable"] = (f.get("ni_fy") > 0).astype("float").where(f.get("ni_fy").notna())
+        f["rev_growth"] = f.get("rev_fy") / f.get("rev_fy_prev") - 1
+        f["ni_margin"] = f.get("ni_fy") / f.get("rev_fy")
+        f["roe"] = f.get("ni_fy") / f.get("equity")
+        f["debt_to_assets"] = f.get("lt_debt") / f.get("assets")
+        f["cash_to_assets"] = f.get("cash") / f.get("assets")
+        f["log_assets"] = np.log(f.get("assets").where(f.get("assets") > 0))
+        f["cash_runway_y"] = (f.get("cash") / -f.get("ni_fy")).where(f.get("ni_fy") < 0)
+    return f.replace([np.inf, -np.inf], np.nan)
+
+
+
+# ---------------------------------------------------------------- 8-K items (this filing and recent ones)
+ITEMS = {"1.01": "agreement", "1.02": "agreement_end", "1.03": "bankruptcy", "2.01": "acquisition_done",
+         "2.03": "new_debt", "2.05": "exit_costs", "2.06": "impairment", "3.01": "delisting_notice",
+         "4.01": "auditor_change", "4.02": "non_reliance", "5.02": "exec_change", "7.01": "reg_fd",
+         "8.01": "other_event"}
+
+
+def item_flags(con, ev: pd.DataFrame) -> pd.DataFrame:
+    """Items on the release's own 8-K, and counts of the company's other 8-K items in the 90 days before."""
+    own = ev[["accession", "items"]].copy()
+    for code, name in ITEMS.items():
+        own[f"item_{name}"] = own["items"].fillna("").str.split(",").map(lambda xs, c=code: c in xs).astype(int)
+    con.register("ev2", ev[["accession", "cik", "trade_date"]])
+    prior = con.execute("""
+        SELECT e.accession, count(*) AS n_8k_90d,
+               sum(list_contains(string_split(f.items, ','), '5.02')::INT) AS n_exec_change_90d,
+               sum(list_contains(string_split(f.items, ','), '4.02')::INT) AS n_non_reliance_90d,
+               sum(list_contains(string_split(f.items, ','), '1.01')::INT) AS n_agreement_90d
+        FROM ev2 e JOIN sec_filings f ON f.cik = e.cik AND f.form LIKE '8-K%'
+             AND f.filing_date < e.trade_date AND f.filing_date >= e.trade_date - INTERVAL 90 DAY
+             AND f.accession <> e.accession
+        GROUP BY 1""").df()
+    out = own.drop(columns="items").merge(prior, on="accession", how="left")
+    return out.fillna({c: 0 for c in prior.columns if c != "accession"})
+
+
+# ---------------------------------------------------------------- EPS history (for the earnings surprise)
+def eps_quarters(con) -> pd.DataFrame:
+    """First-filed quarterly diluted EPS per company: Q1-Q3 from 10-Q durations of ~3 months, Q4 as the
+    fiscal year minus the three quarters (approximate: per-share figures are not exactly additive).
+    `filed` is when the value became public (for Q4, the 10-K)."""
+    df = con.execute("""
+        SELECT cik, start_date, end_date, min(filed) AS filed, arg_min(val, filed) AS eps,
+               date_diff('day', start_date, end_date) AS dur
+        FROM us_facts
+        WHERE concept = 'EarningsPerShareDiluted' AND unit = 'USD/shares' AND start_date IS NOT NULL
+        GROUP BY ALL HAVING dur BETWEEN 80 AND 100 OR dur BETWEEN 350 AND 380""").df()
+    q = df[df.dur <= 100].drop(columns="dur")
+    fy = df[df.dur >= 350]
+    # Q4: quarters ending inside each fiscal year, before its end
+    m = fy.merge(q, on="cik", suffixes=("", "_q"))
+    m = m[(m.start_date_q >= m.start_date - pd.Timedelta(days=5)) & (m.end_date_q < m.end_date - pd.Timedelta(days=20))]
+    g = m.groupby(["cik", "start_date", "end_date"]).agg(n=("eps_q", "size"), s=("eps_q", "sum")).reset_index()
+    q4 = fy.merge(g[g.n == 3], on=["cik", "start_date", "end_date"])
+    q4 = q4.assign(eps=q4.eps - q4.s, start_date=q4.end_date - pd.Timedelta(days=91))[["cik", "start_date", "end_date", "filed", "eps"]]
+    out = pd.concat([q.assign(q4_derived=False), q4.assign(q4_derived=True)], ignore_index=True)
+    return out.sort_values(["cik", "end_date", "filed"]).drop_duplicates(["cik", "end_date"])
+
+
+def eps_history(con, ev: pd.DataFrame, n: int = 8) -> pd.DataFrame:
+    """Per release: the scale of the company's past year-on-year EPS changes (std of the last `n`
+    seasonal differences known before the trade), the input for SUE = (EPS - EPS a year ago) / scale."""
+    q = eps_quarters(con)
+    q["end_date"] = pd.to_datetime(q["end_date"]); q["filed"] = pd.to_datetime(q["filed"])
+    q = q.sort_values(["cik", "end_date"])
+    # seasonal difference: same quarter a year earlier (end dates 350-380 days apart)
+    prev = q[["cik", "end_date", "eps"]].rename(columns={"end_date": "end_prev", "eps": "eps_prev"})
+    q["key"] = q["end_date"] - pd.Timedelta(days=365)
+    d = pd.merge_asof(q.sort_values("key"), prev.sort_values("end_prev"), left_on="key", right_on="end_prev",
+                      by="cik", tolerance=pd.Timedelta(days=20), direction="nearest")
+    d["sdiff"] = d["eps"] - d["eps_prev"]
+    d = d.dropna(subset=["sdiff"]).sort_values(["cik", "filed"])
+    out = []
+    by = {k: g for k, g in d.groupby("cik")}
+    for r in ev[["accession", "cik", "trade_date"]].dropna().itertuples():
+        g = by.get(r.cik)
+        if g is None:
+            continue
+        known = g[g.filed < r.trade_date].tail(n)
+        if len(known) >= 4:
+            out.append((r.accession, float(known.sdiff.std(ddof=1)), len(known),
+                        float(known.eps.iloc[-1]), known.end_date.iloc[-1]))
+    return pd.DataFrame(out, columns=["accession", "eps_sdiff_std", "eps_sdiff_n", "eps_last_known", "eps_last_end"])
 
 
 if __name__ == "__main__":
