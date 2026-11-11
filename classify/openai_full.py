@@ -35,11 +35,14 @@ SOURCE = "us-earnings-full-v4-20261110T123421"        # prepared chunks (Haiku f
 MODEL, EFFORT = "gpt-6-luna", "none"
 PRICE = (0.05, 0.005, 0.25)                           # batch $/MTok: input, cached input, output
 PILOT = "us-earnings-pilot-v4A-20261110T121705-luna-20261110T145454"
-MAX_IN_FLIGHT = 12     # starting point; lowered automatically when OpenAI's batch queue limit is hit
+MAX_IN_FLIGHT = 400    # "fill the queue": send until OpenAI's queued-token limit rejects a batch, then hold
+                       # at that level (user's call 2026-11-11: send it all, let OpenAI take its 24h)
 JOB_SIZE = 500         # requests per batch (~3M tokens), so a new account's queue limit isn't exceeded
 STRAGGLER_H = 3.0
 STRAGGLER_DONE = 0.99
-STALL_H = 1.0          # a batch whose completed count hasn't moved for this long is cancelled and its
+STALL_H = 30.0         # effectively off: cancelling stalled batches (tried 2026-11-10) only restarted
+                       # their 24h clock; OpenAI finishes or expires every batch within 24h anyway.
+                       # (Was 1.0: a batch whose completed count hasn't moved for this long is cancelled and its
                        # unfinished requests re-sent: OpenAI often stops mid-batch for hours (seen 2026-11-10:
                        # four batches stuck at ~45% for over an hour), while fresh batches start quickly
 POLL_S = 120
@@ -213,7 +216,7 @@ def run(max_gbp: float = 55.0, client=None, store=None, poll_s: int = POLL_S, on
     _adopt(client, st)
     per_req, capped = est["gbp_per_release"], False
     if not any(j.get("failures") for j in st["jobs"].values()):   # no queue-limit rejections so far
-        st["max_in_flight"] = max(st.get("max_in_flight", MAX_IN_FLIGHT), MAX_IN_FLIGHT)
+        st["max_in_flight"] = MAX_IN_FLIGHT
     while True:
         changed = False
         for job, j in list(st["jobs"].items()):
@@ -225,8 +228,10 @@ def run(max_gbp: float = 55.0, client=None, store=None, poll_s: int = POLL_S, on
                 # with fewer batches in flight
                 errs = "; ".join(e.message for e in ((b.errors and b.errors.data) or []))[:300]
                 j.update(status="queued", failures=j.get("failures", 0) + 1)
-                st["max_in_flight"] = max(1, st.get("max_in_flight", MAX_IN_FLIGHT) - 1)
-                st["pause_until"] = (datetime.now() + timedelta(minutes=10)).isoformat()
+                # the queue is full at this level: hold there (one fewer), try again in 30 minutes
+                n_sent = sum(1 for x in st["jobs"].values() if x["status"] == "sent")
+                st["max_in_flight"] = max(1, min(st.get("max_in_flight", MAX_IN_FLIGHT), n_sent) - 1)
+                st["pause_until"] = (datetime.now() + timedelta(minutes=30)).isoformat()
                 _save(store, st)
                 log.warning("%s rejected (%s); requeued, %d in flight from now", job, errs, st["max_in_flight"])
                 if j["failures"] > 5:

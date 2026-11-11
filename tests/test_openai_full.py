@@ -141,7 +141,7 @@ def test_queue_limit_rejection_is_retried_with_fewer_in_flight(tmp_path, monkeyp
     store, client = _setup(tmp_path), FakeOpenAI(reject_first=True)
     of.run(max_gbp=1.0, client=client, store=store, poll_s=0, once=True)      # sends the first batches
     st = of.run(max_gbp=1.0, client=client, store=store, poll_s=0, once=True)  # sees the rejection
-    assert st["max_in_flight"] == of.MAX_IN_FLIGHT - 1 and st.get("pause_until")
+    assert st["max_in_flight"] == 1 and st.get("pause_until")   # 2 still queued at OpenAI when the 3rd was refused
     st["pause_until"] = None
     of._save(store, st)
     st = of.run(max_gbp=1.0, client=client, store=store, poll_s=0)
