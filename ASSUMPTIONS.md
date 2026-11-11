@@ -186,3 +186,25 @@ results look better than they really are is flagged with ⚠️.
   Results will be reported by size and liquidity bucket.
 - **Spreads:** no free historical quotes, so the spread is estimated from daily high/low. That's
   rough, and results are rerun with 1.5× and 2× spreads.
+
+## Phase 3: US earnings events (`features/us_earnings.py`)
+
+- **Trade timing:** buy at the open of the first trading day after the release (pre-market release:
+  that morning if the market opens that day; after-close release: the next trading day). Releases
+  during market hours are excluded. The trade-day open is the entry price and is **not** used as a
+  feature (a market-on-open order can't see it), so the overnight gap isn't an input.
+- **Ticker:** today's SEC ticker map joined to Yahoo price series that cover the trade date; with
+  several share classes, the most traded. ⚠️ A ticker reused by a different company could attach the
+  wrong history; the coverage-date check limits but doesn't exclude this.
+- **Prices are split-adjusted to today** (Yahoo), while XBRL share counts and EPS are as reported at
+  the time. Returns and dollar volume are unaffected; **market cap, P/E and P/B are not computed yet**
+  (would be wrong for companies that split later). Needs split histories (small Yahoo download).
+- **Exit rules:** a day whose range touches both bracket levels counts as the stop (conservative);
+  an opening gap through a level fills at the open. Dividends are ignored (short holds).
+  Windows touching stale/suspect prices are excluded (3,931 of 150,518); 1,297 releases have no
+  price on the trade date.
+- **Financials:** only facts filed before the trade date; the first filed value for each period
+  (restatements ignored). Q4 EPS is derived as year minus three quarters (approximate).
+- **Sanity check:** the average 5-day return net of SPY across all releases is about zero (−0.1%),
+  as expected if there's no look-ahead in the pipeline. Extreme values (±300% days) exist and need
+  price/liquidity filters before any backtest.
