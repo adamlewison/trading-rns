@@ -71,3 +71,16 @@ the user: the **liquid universe**. Only releases whose stock traded ≥ $20m a d
 previous 20 days, for training AND trading. Everything else unchanged (models, rules a–f,
 selections, costs, years). Output stage `choose_liquid`. This is the second look at 2019–2021; both
 runs are reported. If nothing passes, no more variants are tried on these years without a new reason.
+
+## Finding 2026-11-12: the spread estimate is far too high for liquid stocks (cost-model error)
+Corwin–Schultz from daily high/low gives AAPL 0.42%, MSFT 0.34%, median 0.5–0.7% for every liquidity
+band, while real quoted spreads for such stocks are a few hundredths of a percent. It measures intraday
+volatility, not the spread. So costs were overstated by ~0.5–0.7% per round trip for liquid stocks.
+Re-priced (same trades, same selection S2) with a full-spread table by 20-day dollar volume:
+≥$500m 0.05%, $100–500m 0.10%, $20–100m 0.20%. This table is an assumption chosen after seeing the
+problem, not measured; real quote data would settle it. Rules e/f buy and sell in the closing auction,
+where the spread matters least.
+Result (liquid, model L, S2, $500): rule e +0.88% per trade net, positive in 2019, 2020, 2021
+(+0.67/+1.26/+0.54); its picks beat the average liquid release by 1.5/2.0/1.05% (average drift
+0.0–0.3%, so not survivorship drift). Model B (no LLM) is negative in 2021. 72 variants have now been
+looked at on these years, so the best one is flattered by selection; only the final test can confirm.
