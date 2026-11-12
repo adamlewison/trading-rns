@@ -80,3 +80,10 @@ mostly companies that have since disappeared). 18 variants (2 universes × 3 sel
   41% below the 52-week high) and are more volatile than the average event. So the signal may be
   partly plain dip-buying rather than insider information; and dip-buyers are the stocks most likely
   to be missing if they later failed (survivorship), which flatters this result.
+
+## FROZEN for the final test (2026-11-12, user agreed)
+**U2 (20-day dollar volume ≥ $20m) + S2 (LightGBM, above last year's top-quintile prediction) +
+H20 (hold 20 trading days)**, $150 × 40-slot account, Trading 212 (primary) and IBKR, spread table as
+above. Run ONCE on 2022 – 2026 Q1 (latest SEC data) with `backtest.us_insiders final --final`. The
+verdict is this one row; the other 17 variants are printed for information only. Not changed or
+re-run afterwards.
