@@ -93,8 +93,9 @@ def simulate(p: pd.DataFrame, strategy: str, start: pd.Timestamp, end: pd.Timest
             value *= 1 + r
             hold = hold * (1 + daily.loc[d].fillna(0))
             hold = hold / hold.sum() if hold.sum() > 0 else hold
-        if d in trade_on or first:
-            src = trade_on.get(d) or me[me < d][-1]
+        past = me[me <= d]
+        if (d in trade_on or first) and len(past):
+            src = trade_on.get(d, past[-1])
             tgt = w_target.loc[src].fillna(0)
             if tgt.sum() > 0:
                 turnover = (tgt - hold).abs().sum()

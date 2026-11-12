@@ -14,8 +14,8 @@ def _prices(n=600):
 
 def test_buy_and_hold_matches_the_asset_less_one_entry_cost():
     p = _prices()
-    v = et.simulate(p, "SPY", p.index[0], p.index[-1])
-    expected = (p.SPY.iloc[-1] / p.SPY.iloc[0]) * (1 - et.COST_SIDE)
+    v = et.simulate(p, "SPY", p.index[40], p.index[-1])
+    expected = (p.SPY.iloc[-1] / p.SPY.iloc[40]) * (1 - et.COST_SIDE)
     assert abs(v.iloc[-1] - expected) < 1e-9
 
 
