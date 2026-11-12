@@ -256,7 +256,7 @@ def report(stage: str) -> str:
     ic = s.drop_duplicates(["model", "rule", "year"]).pivot_table(index=["model", "rule"], columns="year", values="ic")
     lines += ["## Rank correlation of prediction with outcome (all tradable rows)", ic.round(3).to_string(), ""]
     for sel in ("S1", "S2"):
-        t = base[base.select == sel].pivot_table(index=["model", "rule"], columns="size",
+        t = base[base["select"] == sel].pivot_table(index=["model", "rule"], columns="size",
                                                    values=["n", "net"], aggfunc="first")
         lines += [f"## {sel}: trades and mean net return per trade", (t.round(4)).to_string(), ""]
     g = base[base["size"] == 500].set_index(["model", "rule", "select"])[["n", "gross", "net", "hit", "years_net_pos"]]
