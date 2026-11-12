@@ -194,15 +194,30 @@ small caps.
 | Piece | What it is | Notes |
 |---|---|---|
 | **GitHub** | `adamlewison/trading-rns`, branch `claude/uk-smallcap-rns-drift-i83n19` | code and this doc; never data or secrets |
-| **DigitalOcean droplet** `trading-rns` | 178.62.96.171, 1 vCPU / 1GB RAM / 25GB disk + 2GB swap, ~$6/month | the only machine that scrapes and pushes backups; the user connects with **Termius**; agents use `core.remote` (below) and only ask the user if it's down |
+| **DigitalOcean droplet** `trading-rns` | 178.62.96.171, 1 vCPU / 1GB RAM / 25GB disk + 2GB swap, ~$6/month | the only machine that scrapes and pushes backups; the user connects with **Termius**; agents reach it themselves (below) |
 | **Backblaze B2** bucket `trading-rns-backup-c0772b` (private) | backups of everything: UK `trading-rns/v1/`, US `trading-rns/us/v1/`, LLM runs and results `trading-rns/llm/v1/` | keys `B2_KEY_ID` / `B2_APP_KEY` in `.env`; also how cloud sessions get the data (`core.backup pull`) |
 | **Cloud sessions** (Claude Code on the web) | where agents work; fresh container each time, 4 CPU / 16GB | data must be pulled from B2 first; API keys for api.openai.com and ai-gateway.vercel.sh are injected by the session's network proxy (no key in code) |
 | **OpenAI API** | GPT-6 Luna via the Batch API (half price) | prepaid credit topped up by the user; key on the droplet in `/opt/trading-rns-us/.env` (`OPENAI_API_KEY`) |
 | **Anthropic API** | Haiku runner (`classify/us_earnings_full.py`), fallback only | key only on the droplet's `.env`, never in cloud sessions |
 | **Vercel AI Gateway** | used for model comparisons | free tier blocks some models and OpenAI-format batches |
-| **Droplet control** (`core/remote.py`) | agents run shell commands on the droplet through a B2 job queue: `uv run python -W ignore -m core.remote run "CMD" [--cwd DIR]` | cloud sessions can't SSH (only HTTPS leaves the container); the droplet's `trading-rns-agent` service polls B2 every 20s, runs each job once (jobs >1h old are ignored) and stores the output; B2 write access = root on the droplet, so guard the B2 key like an SSH key |
+| **Droplet control** | `deploy/on-droplet.sh "CMD" [DIR]` picks the route: SSH if this machine can, else the B2 job queue | see *Reaching the droplet* below |
 | **Keys** | `.env.example` lists every key and where it lives | cloud sessions: environment network secrets (B2, OpenAI, Vercel) injected by the proxy; droplet: `.env` files |
 | **Scheduled check-in** | a Claude scheduled task that checks the droplet and LLM runs every ~5 hours | re-arms itself; stop it when nothing is running |
+
+**Reaching the droplet** (it depends where the agent runs; `deploy/on-droplet.sh` tries 1 then 2)
+1. **Local machine with SSH:** `ssh root@178.62.96.171`. Check first with
+   `ssh -o BatchMode=yes -o ConnectTimeout=6 root@178.62.96.171 true`.
+2. **Cloud session** (only HTTPS leaves the container, port 22 is refused): the B2 job queue,
+   `uv run python -W ignore -m core.remote run "CMD" [--cwd DIR]`. The droplet's `trading-rns-agent`
+   service (installed by `deploy/setup-agent.sh`) polls B2 every 20s, runs each job once (jobs >1h
+   old are ignored) and stores the output in B2. B2 write access = root on the droplet: guard that key.
+3. **If SSH says "Permission denied (publickey)"** on a local machine, this machine's key isn't on
+   the droplet yet. Ask the user to add it once:
+   - on the local machine, if there's no key yet: `ssh-keygen -t ed25519 -C "trading-rns agent"`;
+     then show the **public** key: `cat ~/.ssh/id_ed25519.pub` (safe to share; never the private key);
+   - on the droplet (Termius, or the job queue): `echo "PASTE_PUBLIC_KEY" >> ~/.ssh/authorized_keys`.
+   If SSH times out or the connection is refused instead, it's the network (e.g. a cloud session):
+   use route 2. If both fail, ask the user to check the droplet in Termius.
 
 **Droplet details**
 - UK checkout `/opt/trading-rns` (services `trading-rns-scrape`, `trading-rns-backup`); US checkout
@@ -215,57 +230,25 @@ small caps.
   `core.backup push` elsewhere while it runs (two writers corrupt the backup).
 - DuckDB repair after a failed checkpoint: `core.dbcheck --profile us --checkpoint`.
 
-**Layout**
-```
-config.yaml   all settings (shared, then uk:, us:)
-core/         config, DuckDB connections, polite HTTP client, B2 backup, logging
-ingest/       shared/prices.py; uk/ (LSE universe, Investegate RNS, SETS/SETSqx); us/ (EDGAR, docs,
-              XBRL facts, Yahoo prices and splits). Each market: common.py, schema.py, backup.py, run_all.sh
-classify/     anonymise.py; us_earnings*.py (prompt, Haiku runner); openai_full.py (Luna batches);
-              labels.py (results -> labels table)
-features/     us_earnings.py (events, outcomes, context); us_earnings_labels.py (labels, SUE, valuation)
-backtest/     us_earnings.py (walk-forward); us_account.py ($6k account); DESIGN_*.md (test records)
-deploy/       droplet setup and backup loop
-tests/        pytest
-```
-| | UK | US |
-|---|---|---|
-| database | `data/uk.duckdb` | `data/us.duckdb` |
-| raw cache | `data/raw/uk/` | `data/raw/us/` |
-| B2 folder | `trading-rns/v1/` | `trading-rns/us/v1/` |
+**Layout:** `config.yaml` (all settings); `core/` (config, DuckDB, polite HTTP, B2 backup, remote
+jobs); `ingest/uk|us/` (data; each has `common.py`, `schema.py`, `backup.py`, `run_all.sh`);
+`classify/` (anonymise, prompts, Luna/Haiku runners, labels table); `features/`; `backtest/` (incl.
+`DESIGN_*.md` test records); `deploy/` (droplet setup, backup loop, agent runner); `tests/`.
+Databases `data/uk.duckdb`, `data/us.duckdb`; raw caches `data/raw/uk|us/`.
 
-**Setup:** `uv sync`; `cp .env.example .env` (B2 keys, `SEC_USER_AGENT="Name email"`); `uv run pytest`.
-Every data step is resumable and cached.
-
-**Data**
+**Commands** (setup: `uv sync`, `cp .env.example .env`, `uv run pytest`; every data step is resumable)
 ```bash
-nohup ingest/uk/run_all.sh >> data/logs/uk_run.out 2>&1 &     # UK: universe, prices, announcements, SETS
-uv run python -m ingest.uk.announcements.run index --mode company|daily   # daily also finds delisted names
-uv run python -m ingest.uk.trading_service import-mm FILE.xlsx           # LSE market makers (hand download)
-nohup ingest/us/run_all.sh >> data/logs/us_run.out 2>&1 &     # US: index, tickers, submissions, docs, facts, prices
-uv run python -m ingest.us.run splits                          # split histories
-uv run python -m ingest.uk.announcements.run report ; uv run python -m ingest.us.run report
-```
-
-**Labels, features, backtests**
-```bash
-uv run python -W ignore -m classify.openai_full estimate|run --max-gbp 55|status   # Luna batches (resumable)
-uv run python -W ignore -m classify.labels build|report
-uv run python -W ignore -m features.us_earnings build
-uv run python -W ignore -m features.us_earnings_labels build
-uv run python -W ignore -m backtest.us_earnings choose [--universe liquid]
-uv run python -W ignore -m backtest.us_account choose --hold 20     # final runs need --final, once
-```
-
-**Backups (B2)**
-```bash
+nohup ingest/uk/run_all.sh >> data/logs/uk_run.out 2>&1 &     # UK data (index --mode daily also finds delisted)
+nohup ingest/us/run_all.sh >> data/logs/us_run.out 2>&1 &     # US data; `ingest.us.run splits` for splits
 uv run python -W ignore -m core.backup status --remote --profile uk|us   # watch the droplet (read-only)
-uv run python -m core.backup pull --profile uk|us --force [--skip-raw]   # get data locally
-uv run python -m core.backup pull-bulk --profile us                     # SEC zips
-# after a UK pull: uv run python -m ingest.uk.announcements.run build
+uv run python -m core.backup pull --profile uk|us --force [--skip-raw]   # data from B2 (UK: then announcements.run build)
+uv run python -W ignore -m classify.openai_full run --max-gbp 55|status  # Luna batches (resumable)
+uv run python -W ignore -m classify.labels build|report
+uv run python -W ignore -m features.us_earnings build && uv run python -W ignore -m features.us_earnings_labels build
+uv run python -W ignore -m backtest.us_account choose --hold 20          # final runs need --final, once
 ```
-A local file is deleted only after its upload is verified; a push never replaces a non-empty table
-snapshot with an empty one. The US loop prunes cached SEC pages after upload; the UK cache is never pruned.
+Backups never lose data: local files are deleted only after a verified upload, and a push never
+replaces a table snapshot with an empty one. Only the US loop prunes cached SEC pages.
 
 ## 10. Open items
 - **UK market makers:** the user downloads LSE's "Registered Market Makers by Security" file by hand,
