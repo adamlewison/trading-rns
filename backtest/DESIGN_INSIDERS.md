@@ -65,3 +65,18 @@ universe's average (to separate the pick from general drift).
 - ⚠️ Survivorship: small companies that later failed have no prices, and insider buying is
   concentrated in small caps. Results are flattered; report the share of events with no price.
 - Many events cluster in sell-offs (insiders buy dips): March 2020 will weigh heavily.
+
+## Choose-years result (2019–2021, run 2026-11-12)
+208,677 events built; 69,811 priced (29% of 2012 events rising to 87% in 2026: the missing ones are
+mostly companies that have since disappeared). 18 variants (2 universes × 3 selections × 3 exits).
+- **Every-event (S0) and cluster (S1) picks did not beat costs** in the account: most variants lost
+  to the market; none was positive in all three years.
+- **The model (S2) picks clearly beat the average insider event** in every universe and exit
+  (e.g. liquid, 20 days: +1.3/+3.8/+2.3% vs +0.1/−0.2/+1.1% per event).
+- **Only one variant beat the market after costs in all three years: U2 (liquid) + S2 + H20**:
+  +$176 / +$150 / +$336 on the $6,000 account with Trading 212 (+3%, +2.5%, +5.6%; +$662 total).
+  T60 variants made most of their money in 2020 only.
+- What the model picks: insider buys in stocks that have **fallen a lot** (median −23% over 60 days,
+  41% below the 52-week high) and are more volatile than the average event. So the signal may be
+  partly plain dip-buying rather than insider information; and dip-buyers are the stocks most likely
+  to be missing if they later failed (survivorship), which flatters this result.

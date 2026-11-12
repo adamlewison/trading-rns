@@ -42,7 +42,9 @@ then paper trading, then small size.
 - **Tried:** US earnings drift: **failed** the final test (section 6).
 - **Now:** insider buying. Data done 2026-11-12: `us_insider_tx` = 7.09m Form 4 transactions, 837k purchases,
   2006 Q1 – 2026 Q1 (SEC hadn't published 2026 Q2 yet; `ingest.us.run insiders --refresh` adds new quarters).
-  Design written before results: `backtest/DESIGN_INSIDERS.md`. Next: build and run on 2019–2021 (user's go-ahead).
+  Design: `backtest/DESIGN_INSIDERS.md`. **2019–2021 result:** only liquid stocks + model picks + 20-day hold beat the
+  market after costs every year (+$662 over 3 years on $6k); the rest mostly lost. Next: user decides whether to
+  freeze that setup for the one-time 2022–2026 test.
 - **The user's account:** about $6,000, around $150 per trade, Trading 212, holds up to ~20 days.
 - Droplet runner (`trading-rns-agent`) installed 2026-11-12: agents reach the droplet themselves (~6s a command).
 - If the last ~419 Luna labels arrive (155 small batches still at OpenAI, `luna-run` service waiting): `classify.labels build`, then `features.us_earnings_labels build`.
