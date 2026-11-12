@@ -48,3 +48,12 @@ Pass = the account beats the FTSE All-Share (^FTAS, as the index fund) after cos
 - ⚠️ Yahoo's UK open is often an auction or mid price; the spread and slippage above are meant to cover
   the real fill, but may not for illiquid names.
 - `headline_category` is a rough regex label (the LLM pilot would replace it).
+
+## Choose-years result (2019–2021, run 2026-11-12): fails, no final test run
+129,077 announcement days built; 52,912 priced (most others belong to delisted companies), 17,703
+tradable 2012–2021. Fit years (seen before the run): +0.1% to +0.7% over 5 days for the best categories
+(results, fundraise, dividend, director dealing), −1% to −4% after contract wins and "operational" news.
+2019–2021: average round-trip cost of the trades 2.4–2.8% (spread table + slippage + stamp duty) against
+gross excess of −8% to +2.5% per event. All 60 variants (11 categories + the model × 5 exits) lost to the
+benchmark after costs; none positive in more than one year. Closest: the model's picks held 20 days
+(+2.46% gross vs 2.76% cost, −£638 over three years on a £4,800 account). Final years not used.

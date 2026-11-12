@@ -42,6 +42,7 @@ then paper trading, then small size.
 - **Tried (all failed, section 6):** US earnings drift and insider buying (final tests); no-news reversals,
   the pre-earnings run-up and ETF trend-following (choose period; final years unused).
 - **Leveraged trend-following** passed 1994–2021 but **failed its final test** (2022 → now: +7% vs SPY +69%).
+- **UK news drift (no LLM)** failed on 2019–2021: costs ~2.5–2.8% a round trip beat every category.
 - **Next:** user to choose (section 7).
 - **The user's account:** about $6,000, around $150 per trade, Trading 212, holds up to ~20 days.
 - Droplet runner (`trading-rns-agent`) installed 2026-11-12: agents reach the droplet themselves (~6s a command).
@@ -116,6 +117,7 @@ then paper trading, then small size.
 | US pre-earnings run-up: buy 6 days before the expected release (last year's date + 364 days, right within ±3 days 72% of the time), sell before or just after it | **Failed on 2019–2021** (final years unused): ≈0% vs the market before costs, the model didn't help, every variant lost | `backtest/DESIGN_RUNUP.md` |
 | ETF trend-following / momentum (Faber GTAA-5, dual momentum, top-3-of-10, S&P timing), monthly, 2007–2021 | **Failed the pass rule** (beat holding the S&P 500): best 9.1%/yr vs 10.8% for SPY; halved the worst falls (−22% vs −55%) but lost through whipsaws in a long bull market | `backtest/DESIGN_ETF_TREND.md` |
 | Leveraged trend: 2× (or 1.5×) S&P 500 fund only while the trend is up, else T-bills; modelled with financing, fees, daily reset | **Failed the final test.** Won 1994–2021 (16.3%/yr vs SPY 10.7%) by sidestepping 2001–02 and 2008, but 2022 → now made +7% vs SPY +69% (worst fall −49% vs −25%): the choppy 2022 bear whipsawed the monthly signal and leverage doubled each miss | `backtest/DESIGN_LEVERAGED_TREND.md` |
+| UK RNS news drift, no LLM: pre-open announcements by headline category or a model, buy at the 08:00 open, hold 1–20 days or ATR bracket | **Failed on 2019–2021** (final years unused): gross drift −8% to +2.5% per event vs 2.4–2.8% round-trip costs; all 60 variants lost; closest was the model's picks held 20 days (+2.5% gross vs 2.8% cost) | `backtest/DESIGN_UK_NEWS.md` |
 
 Every strategy whose final test ran has spent its final years: further work on them can only be judged live (paper trading)
 or with delisted prices. Open lead: the insider model's small-stock picks (worth a paper trial).
@@ -125,12 +127,13 @@ or with delisted prices. Open lead: the insider model's small-stock picks (worth
 | # | Strategy | Data | LLM cost | Why here |
 |---|---|---|---|---|
 | 1 | **US news drift** (deals, CEO exits, profit warnings) | have it (421,832 filings) | ~$140 | Only with a reason to expect a bigger effect than earnings |
-| 2 | **UK RNS news drift** | have it | pilot first | High costs |
+| 2 | **UK news drift with LLM labels** | have it | pilot ~£1, full ~£40 | No-LLM model got within 0.3% of costs at 20 days; labels lifted US ranking ~50%. Survivorship flatters |
 
 
 Also: **UK director dealings** (RNS) is untested; the US result lowers its priority.
 1. **US news drift.** The earnings pipeline on other 8-Ks; only with a reason to expect a bigger effect.
-2. **UK RNS news drift.** Data complete; costs are the problem. Market-maker file still pending.
+2. **UK news drift with LLM labels.** The no-LLM baseline failed narrowly at 20-day holds; worth a
+   pilot only if the user wants to keep the UK track open.
 
 **Exit ideas** (tools applied per strategy, fixed before each test):
 - **A. Targets scaled to each stock's normal move (default):** target and stop as multiples of the
