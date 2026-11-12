@@ -9,7 +9,7 @@
     uv run python -W ignore -m core.remote result JOB_ID
 
 How: the caller writes a job (a bash command) to B2 under `trading-rns/control/jobs/`; the droplet's
-runner polls every POLL_S seconds, runs it with a timeout, and writes stdout/stderr and the exit code
+runner polls every POLL_S seconds (IDLE_POLL_S when idle), runs it with a timeout, and writes stdout/stderr and the exit code
 to `trading-rns/control/results/`. Only HTTPS to B2 is needed on both sides.
 
 Trust: anyone who can write to the bucket can run commands as root on the droplet, so the B2 key is
@@ -31,7 +31,9 @@ from core.log import get_logger
 
 log = get_logger("remote")
 ROOT = "trading-rns/control"
-POLL_S = 20
+POLL_S = 5                             # while busy (a job in the last BUSY_FOR)
+IDLE_POLL_S = 15                       # otherwise: keeps B2 list calls near the free daily quota
+BUSY_FOR = timedelta(minutes=10)
 MAX_AGE = timedelta(hours=1)
 MAX_OUT = 200_000                      # characters kept from each of stdout and stderr
 DEFAULT_CWD = "/opt/trading-rns-us"
@@ -54,9 +56,9 @@ def result(jid: str, store=None) -> dict | None:
     return json.loads(raw) if raw else None
 
 
-def wait(jid: str, timeout_s: int, store=None, poll_s: float = 5) -> dict:
+def wait(jid: str, timeout_s: int, store=None, poll_s: float = 2) -> dict:
     store = store or get_store()
-    end = time.time() + timeout_s + 3 * POLL_S + 60
+    end = time.time() + timeout_s + 3 * IDLE_POLL_S + 60
     while time.time() < end:
         r = result(jid, store)
         if r:
@@ -79,10 +81,12 @@ def run_job(job: dict) -> dict:
             "started": datetime.fromtimestamp(t0, timezone.utc).isoformat(), "seconds": round(time.time() - t0, 1)}
 
 
-def serve_once(store=None) -> int:
-    """Run every pending job once; returns how many ran."""
+def serve_once(store=None, done: set | None = None) -> int:
+    """Run every pending job once; returns how many ran. `done` (job file names already answered) is
+    kept by the caller so each poll costs one B2 list call; without it, results are listed."""
     store = store or get_store()
-    done = {k.rsplit("/", 1)[-1] for k in store.list(f"{ROOT}/results/")}
+    if done is None:
+        done = {k.rsplit("/", 1)[-1] for k in store.list(f"{ROOT}/results/")}
     n = 0
     for key in sorted(store.list(f"{ROOT}/jobs/")):
         name = key.rsplit("/", 1)[-1]
@@ -96,18 +100,25 @@ def serve_once(store=None) -> int:
             res = run_job(job)
             log.info("job %s finished: exit %s in %ss", job["id"], res["exit"], res["seconds"])
         store.put(f"{ROOT}/results/{name}", json.dumps(res).encode())
+        done.add(name)
         n += 1
     return n
 
 
 def serve() -> None:
-    log.info("remote runner started; polling %s every %ss", ROOT, POLL_S)
+    log.info("remote runner started; polling %s every %ss (busy) / %ss (idle)", ROOT, POLL_S, IDLE_POLL_S)
+    done, last_job, store = None, _now() - BUSY_FOR, None
     while True:
         try:
-            serve_once()
+            store = store or get_store()             # log in once; again only after an error
+            if done is None:
+                done = {k.rsplit("/", 1)[-1] for k in store.list(f"{ROOT}/results/")}
+            if serve_once(store, done):
+                last_job = _now()
         except Exception as e:                  # network hiccup: keep going
             log.warning("runner: %s: %s", type(e).__name__, str(e)[:200])
-        time.sleep(POLL_S)
+            store = None
+        time.sleep(POLL_S if _now() - last_job < BUSY_FOR else IDLE_POLL_S)
 
 
 def main() -> None:
