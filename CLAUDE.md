@@ -194,12 +194,14 @@ small caps.
 | Piece | What it is | Notes |
 |---|---|---|
 | **GitHub** | `adamlewison/trading-rns`, branch `claude/uk-smallcap-rns-drift-i83n19` | code and this doc; never data or secrets |
-| **DigitalOcean droplet** `trading-rns` | 178.62.96.171, 1 vCPU / 1GB RAM / 25GB disk + 2GB swap, ~$6/month | the only machine that scrapes and pushes backups; the user connects with **Termius** (agents can't SSH: give the user commands) |
+| **DigitalOcean droplet** `trading-rns` | 178.62.96.171, 1 vCPU / 1GB RAM / 25GB disk + 2GB swap, ~$6/month | the only machine that scrapes and pushes backups; the user connects with **Termius**; agents use `core.remote` (below) and only ask the user if it's down |
 | **Backblaze B2** bucket `trading-rns-backup-c0772b` (private) | backups of everything: UK `trading-rns/v1/`, US `trading-rns/us/v1/`, LLM runs and results `trading-rns/llm/v1/` | keys `B2_KEY_ID` / `B2_APP_KEY` in `.env`; also how cloud sessions get the data (`core.backup pull`) |
 | **Cloud sessions** (Claude Code on the web) | where agents work; fresh container each time, 4 CPU / 16GB | data must be pulled from B2 first; API keys for api.openai.com and ai-gateway.vercel.sh are injected by the session's network proxy (no key in code) |
 | **OpenAI API** | GPT-6 Luna via the Batch API (half price) | prepaid credit topped up by the user; key on the droplet in `/opt/trading-rns-us/.env` (`OPENAI_API_KEY`) |
 | **Anthropic API** | Haiku runner (`classify/us_earnings_full.py`), fallback only | key only on the droplet's `.env`, never in cloud sessions |
 | **Vercel AI Gateway** | used for model comparisons | free tier blocks some models and OpenAI-format batches |
+| **Droplet control** (`core/remote.py`) | agents run shell commands on the droplet through a B2 job queue: `uv run python -W ignore -m core.remote run "CMD" [--cwd DIR]` | cloud sessions can't SSH (only HTTPS leaves the container); the droplet's `trading-rns-agent` service polls B2 every 20s, runs each job once (jobs >1h old are ignored) and stores the output; B2 write access = root on the droplet, so guard the B2 key like an SSH key |
+| **Keys** | `.env.example` lists every key and where it lives | cloud sessions: environment network secrets (B2, OpenAI, Vercel) injected by the proxy; droplet: `.env` files |
 | **Scheduled check-in** | a Claude scheduled task that checks the droplet and LLM runs every ~5 hours | re-arms itself; stop it when nothing is running |
 
 **Droplet details**
