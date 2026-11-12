@@ -39,8 +39,9 @@ then paper trading, then small size.
 ## 1. Status (2026-11-12)
 - **Data:** UK done (RNS announcements 2012–2026, prices for 874 tickers, SETS/SETSqx). US done
   (all 8-Ks 2012–2026 with text, XBRL facts, prices for 7,627 tickers, split histories).
-- **Tried:** US earnings drift and US insider buying: both **failed** their final tests (section 6).
-- **Next:** no-news reversals (section 7). Waiting for the user's go-ahead.
+- **Tried:** US earnings drift, US insider buying (both failed their final tests) and no-news reversals
+  (failed on 2019–2021, final years unused). Section 6.
+- **Next:** run-up before scheduled earnings (section 7). Waiting for the user's go-ahead.
 - **The user's account:** about $6,000, around $150 per trade, Trading 212, holds up to ~20 days.
 - Droplet runner (`trading-rns-agent`) installed 2026-11-12: agents reach the droplet themselves (~6s a command).
 - If the last ~419 Luna labels arrive (155 small batches still at OpenAI, `luna-run` service waiting): `classify.labels build`, then `features.us_earnings_labels build`.
@@ -84,7 +85,8 @@ then paper trading, then small size.
    on 2022–2026. Design first, count every try, keep a final test untouched.
 6. **Simulate the real account.** Signals come in bursts (earnings season) and 40 slots fill with
    the first ones, not the best. This changed results a lot.
-7. **Post-earnings drift after the next open is gone in liquid US stocks (2022–2026).**
+7. **In liquid US stocks the simple published effects are gone after costs:** post-earnings drift after
+   the next open (2022–2026) and short-term reversal after no-news falls (2019–2021, ≈0% gross).
 8. **Survivorship:** almost no prices for delisted companies (US or UK); every result is flattered
    until that's fixed (paid options in section 10).
 9. **Infrastructure:** on the 1GB droplet every DuckDB connection needs `ROW_GROUP_SIZE 8192`
@@ -105,6 +107,7 @@ then paper trading, then small size.
 |---|---|---|
 | US earnings drift: Luna-labelled releases, LightGBM model scores them, 6 exit rules × 3 models, then the $6k account | **Failed.** Labels improved the ranking but the edge was smaller than costs; the best setup (liquid stocks, buy at the release day's close, hold 20 days, $150 × 40) lost to the market by $1,283 over 2022–2026 | `backtest/DESIGN_US_EARNINGS.md` |
 | US insider buying: Form 4 purchases by officers/directors at market prices (500k purchases, 2012–2026), 2 universes × 3 selections × 3 exits, $6k account | **Failed.** Buying every insider purchase or clusters lost to costs. The model's picks (mostly insider buys after big falls) beat the average event; the frozen setup (liquid, model, 20 days) won 2019–21 but lost $468 vs the market in 2022–26. Small-stock model picks were positive in 2022–26 but that's where survivorship bias is worst | `backtest/DESIGN_INSIDERS.md` |
+| US no-news reversals: liquid stocks falling ≥2.5σ vs the market with no 8-K, buy at the close or next open, hold 1–5 days or ATR bracket | **Failed on 2019–2021** (final years unused): no bounce on average (≈0% vs the market), the model didn't help, every variant lost every year after costs. Also says plain short-term dip-buying isn't what drove the insider picks | `backtest/DESIGN_REVERSALS.md` |
 
 Both strategies' final years are spent: further work on them can only be judged live (paper trading)
 or with delisted prices. Open lead: the insider model's small-stock picks (worth a paper trial).
@@ -113,19 +116,16 @@ or with delisted prices. Open lead: the insider model's small-stock picks (worth
 
 | # | Strategy | Data | LLM cost | Why here |
 |---|---|---|---|---|
-| 1 | **No-news reversals** | have it | none | Cheap to test |
-| 2 | **Run-up before scheduled earnings** | have it | none | Cheap; small edge, liquid stocks only |
-| 3 | **US news drift** (deals, CEO exits, profit warnings) | have it (421,832 filings) | ~$140 | Only if 1–2 find nothing |
-| 4 | **UK RNS news drift** | have it | pilot first | High costs |
+| 1 | **Run-up before scheduled earnings** | have it | none | Cheap; small edge, liquid stocks only |
+| 2 | **US news drift** (deals, CEO exits, profit warnings) | have it (421,832 filings) | ~$140 | Only if 1 finds nothing |
+| 3 | **UK RNS news drift** | have it | pilot first | High costs |
 
 
 Also: **UK director dealings** (RNS) is untested; the US result lowers its priority.
-1. **No-news reversals.** It also tells us whether the insider model's edge was just dip-buying. A stock falls sharply (worse than −2× its normal daily move and the market)
-   on a day with no filing: buy at the close, hold a few days. Risk: news we can't see. Liquid only.
-2. **Run-up before scheduled earnings.** Buy ~5 trading days before the expected results date (from
+1. **Run-up before scheduled earnings.** Buy ~5 trading days before the expected results date (from
    past release dates), sell the day before.
-3. **US news drift.** The earnings pipeline on other 8-Ks; only with a reason to expect a bigger effect.
-4. **UK RNS news drift.** Data complete; costs are the problem. Market-maker file still pending.
+2. **US news drift.** The earnings pipeline on other 8-Ks; only with a reason to expect a bigger effect.
+3. **UK RNS news drift.** Data complete; costs are the problem. Market-maker file still pending.
 
 **Exit ideas** (tools applied per strategy, fixed before each test):
 - **A. Targets scaled to each stock's normal move (default):** target and stop as multiples of the

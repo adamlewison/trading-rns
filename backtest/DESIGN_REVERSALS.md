@@ -55,3 +55,10 @@ problem for liquid stocks and short holds).
 before 16:00 ET or its time is unknown (items we didn't download). Previous-day 8-Ks always count.
 Seen before the change: on the fit years 2012–2018 the average no-news fall kept falling (−0.3% vs the
 market over 5 days, close entry); nothing from 2019 on had been looked at.
+
+## Choose-years result (2019–2021, run 2026-11-12): fails, no final test run
+10,199 usable events 2012–2021 (4,267 in 2019–2021). All 16 variants (2 entries × 4 exits × 2
+selections) lost to the market in every year with Trading 212 (every-event: −$4,500 to −$6,200 over
+three years on $6,000; model picks: −$1,900 to −$2,300). Gross excess per event ≈ 0 (−0.24% to +0.04%);
+the model's picks did no better (−0.03% to −0.89%). No bounce to harvest in liquid US stocks after
+no-news falls, at 1–5 days. The final years were not used (nothing passed).
