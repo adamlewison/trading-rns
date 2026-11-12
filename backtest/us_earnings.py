@@ -209,9 +209,9 @@ def report(stage: str) -> str:
         t = base[base.select == sel].pivot_table(index=["model", "rule"], columns="size",
                                                    values=["n", "net"], aggfunc="first")
         lines += [f"## {sel}: trades and mean net return per trade", (t.round(4)).to_string(), ""]
-    g = base[(base.size == 500)].set_index(["model", "rule", "select"])[["n", "gross", "net", "hit", "years_net_pos"]]
+    g = base[base["size"] == 500].set_index(["model", "rule", "select"])[["n", "gross", "net", "hit", "years_net_pos"]]
     lines += ["## At $500 per trade", g.round(4).to_string(), ""]
-    sx = p[(p.size == 500)].pivot_table(index=["model", "rule", "select"], columns="spread_x", values="net")
+    sx = p[p["size"] == 500].pivot_table(index=["model", "rule", "select"], columns="spread_x", values="net")
     lines += ["## Spread robustness at $500 (net per trade by spread multiplier)", sx.round(4).to_string(), ""]
     sh = s.drop_duplicates(["model", "rule", "year"]).groupby(["model", "rule"]).apply(
         lambda x: pd.Series({"short_gross": (x.short_gross * x.short_n).sum() / x.short_n.sum(), "n": x.short_n.sum()}))
