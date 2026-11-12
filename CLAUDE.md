@@ -40,7 +40,9 @@ then paper trading, then small size.
 - **Data:** UK done (RNS announcements 2012–2026, prices for 874 tickers, SETS/SETSqx). US done
   (all 8-Ks 2012–2026 with text, XBRL facts, prices for 7,627 tickers, split histories).
 - **Tried:** US earnings drift: **failed** the final test (section 6).
-- **Next:** insider buying (section 7). Waiting for the user's go-ahead.
+- **Now:** insider buying. Data done 2026-11-12: `us_insider_tx` = 7.09m Form 4 transactions, 837k purchases,
+  2006 Q1 – 2026 Q1 (SEC hadn't published 2026 Q2 yet; `ingest.us.run insiders --refresh` adds new quarters).
+  Design written before results: `backtest/DESIGN_INSIDERS.md`. Next: build and run on 2019–2021 (user's go-ahead).
 - **The user's account:** about $6,000, around $150 per trade, Trading 212, holds up to ~20 days.
 - Droplet runner (`trading-rns-agent`) installed 2026-11-12: agents reach the droplet themselves (~6s a command).
 - If the last ~419 Luna labels arrive (155 small batches still at OpenAI, `luna-run` service waiting): `classify.labels build`, then `features.us_earnings_labels build`.
@@ -109,7 +111,7 @@ Earnings drift's final years are spent; any further work on it can only be judge
 
 | # | Strategy | Data | LLM cost | Why here |
 |---|---|---|---|---|
-| 1 | **Insider buying** (US + UK) | SEC insider data sets (free bulk download); UK director dealings in RNS | none | Strongest published evidence; few trades so costs hardly matter; fits a small pot |
+| 1 | **Insider buying** (US + UK) | US: `us_insider_tx` (downloaded); UK director dealings in RNS | none | Strongest published evidence; few trades so costs hardly matter; fits a small pot |
 | 2 | **No-news reversals** | have it | none | Cheap to test |
 | 3 | **Run-up before scheduled earnings** | have it | none | Cheap; small edge, liquid stocks only |
 | 4 | **US news drift** (deals, CEO exits, profit warnings) | have it (421,832 filings) | ~$140 | Only if 1–3 find nothing |
