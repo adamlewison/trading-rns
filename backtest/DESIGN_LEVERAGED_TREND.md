@@ -53,3 +53,10 @@ compared. Next: the user chooses which one to freeze for the one-time final test
 month-end close is above its 10-month average, else T-bills; switch at the next day's close; 0.30% per
 side per switch. Run ONCE on 2022-01 → latest data with `backtest.leveraged_trend final --final`.
 Pass = higher total return than SPY held over that period. Not changed or re-run afterwards.
+
+## FINAL TEST RESULT (2022-01 → 2026-11-12, run once): fails
+L1 +6.7% total (1.4%/yr), worst fall −49%, vs SPY held +68.9% (11.4%/yr), worst fall −25%. 2022: L1 −40.8%
+vs SPY −18.6%: the bear market was a slow, choppy decline with sharp rallies, so the monthly signal got
+out late and back in at the wrong times (1× timing also lagged: −22%); leverage doubled each mistake.
+L1 then trailed in 2023 (+9% vs +27%) after re-entering late. For information (not a verdict): the 2×
+fund held throughout made +93%, the 200-day version +33%.

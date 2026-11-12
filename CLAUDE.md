@@ -41,9 +41,8 @@ then paper trading, then small size.
   (all 8-Ks 2012–2026 with text, XBRL facts, prices for 7,627 tickers, split histories).
 - **Tried (all failed, section 6):** US earnings drift and insider buying (final tests); no-news reversals,
   the pre-earnings run-up and ETF trend-following (choose period; final years unused).
-- **Now:** leveraged trend-following (2× S&P 500 only while above its 10-month average) **beat SPY on
-  1994–2021** (16.3% vs 10.7%/yr, worst fall −40% vs −55%). Waiting for the user to pick the setup to
-  freeze for the one-time 2022 → latest test (`backtest/DESIGN_LEVERAGED_TREND.md`).
+- **Leveraged trend-following** passed 1994–2021 but **failed its final test** (2022 → now: +7% vs SPY +69%).
+- **Next:** user to choose (section 7).
 - **The user's account:** about $6,000, around $150 per trade, Trading 212, holds up to ~20 days.
 - Droplet runner (`trading-rns-agent`) installed 2026-11-12: agents reach the droplet themselves (~6s a command).
 - If the last ~419 Luna labels arrive (155 small batches still at OpenAI, `luna-run` service waiting): `classify.labels build`, then `features.us_earnings_labels build`.
@@ -91,7 +90,8 @@ then paper trading, then small size.
    the next open (2022–2026), short-term reversal after no-news falls and the pre-earnings run-up
    (2019–2021, both ≈0% before costs). Prefer strategies that trade rarely.
 11. **Trend-following lowers risk but lags buy-and-hold in bull markets** (2007–2021: 9.1% vs 10.8%/yr).
-    Beating the index needs a real edge, not just crash protection.
+    Adding leverage made it beat the index over 1994–2021 (two slow crashes it dodged) and lose badly in
+    2022–26 (a choppy bear it didn't): its result rests on a handful of crash episodes, so it's fragile.
 8. **Survivorship:** almost no prices for delisted companies (US or UK); every result is flattered
    until that's fixed (paid options in section 10).
 9. **Infrastructure:** on the 1GB droplet every DuckDB connection needs `ROW_GROUP_SIZE 8192`
@@ -115,9 +115,9 @@ then paper trading, then small size.
 | US no-news reversals: liquid stocks falling ≥2.5σ vs the market with no 8-K, buy at the close or next open, hold 1–5 days or ATR bracket | **Failed on 2019–2021** (final years unused): no bounce on average (≈0% vs the market), the model didn't help, every variant lost every year after costs. Also says plain short-term dip-buying isn't what drove the insider picks | `backtest/DESIGN_REVERSALS.md` |
 | US pre-earnings run-up: buy 6 days before the expected release (last year's date + 364 days, right within ±3 days 72% of the time), sell before or just after it | **Failed on 2019–2021** (final years unused): ≈0% vs the market before costs, the model didn't help, every variant lost | `backtest/DESIGN_RUNUP.md` |
 | ETF trend-following / momentum (Faber GTAA-5, dual momentum, top-3-of-10, S&P timing), monthly, 2007–2021 | **Failed the pass rule** (beat holding the S&P 500): best 9.1%/yr vs 10.8% for SPY; halved the worst falls (−22% vs −55%) but lost through whipsaws in a long bull market | `backtest/DESIGN_ETF_TREND.md` |
-| Leveraged trend: 2× (or 1.5×) S&P 500 fund only while the trend is up, else T-bills; modelled with financing, fees, daily reset | **Passed the choose period 1994–2021** (L1 16.3%/yr vs SPY 10.7%, worst fall −40% vs −55%); final test pending | `backtest/DESIGN_LEVERAGED_TREND.md` |
+| Leveraged trend: 2× (or 1.5×) S&P 500 fund only while the trend is up, else T-bills; modelled with financing, fees, daily reset | **Failed the final test.** Won 1994–2021 (16.3%/yr vs SPY 10.7%) by sidestepping 2001–02 and 2008, but 2022 → now made +7% vs SPY +69% (worst fall −49% vs −25%): the choppy 2022 bear whipsawed the monthly signal and leverage doubled each miss | `backtest/DESIGN_LEVERAGED_TREND.md` |
 
-Both strategies' final years are spent: further work on them can only be judged live (paper trading)
+Every strategy whose final test ran has spent its final years: further work on them can only be judged live (paper trading)
 or with delisted prices. Open lead: the insider model's small-stock picks (worth a paper trial).
 
 ## 7. What's next, in priority order
