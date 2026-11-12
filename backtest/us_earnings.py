@@ -23,7 +23,9 @@ OUT = ROOT / "data" / "backtest"
 TEST_START = pd.Timestamp("2022-01-01")
 CHOOSE = [2019, 2020, 2021]
 FIRST_PRED_YEAR = 2016
-RULES = "abcd"
+RULES = "abcdef"
+HOLD_CLOSE = {"e": 20, "f": 60}          # buy at the day-1 close, hold N trading days
+REACT = ["gap", "day1_ret", "day1_x"]       # known at the day-1 close: only for e/f
 SIZES = [30, 100, 200, 500]
 SPREAD_X = [1.0, 1.5, 2.0]
 MIN_PRICE, MIN_DOLLAR_VOL = 1.0, 500_000
@@ -115,10 +117,57 @@ def load(final: bool = False) -> pd.DataFrame:
     d["fp_q4"] = (d.fiscal_period.isin(["Q4", "FY"])).astype(float)
     d["fp_unknown"] = (d.fiscal_period.isin(["unknown", "other"])).astype(float)
     big = d.mcap >= BIG_CAP
-    for r in RULES:
+    for r in "abcd":
         d[f"y_{r}"] = np.where(big, d[f"x_{r}_spy"], d[f"x_{r}_iwm"])
+    d = add_close_entry(d, big)
     d["spread_cs"] = add_spreads(d)
     return d.reset_index(drop=True)
+
+
+def close_entry(o, c, bad, i: int, end: int, hold: int):
+    """Buy at the close of day i (the trade date), sell at the close `hold` days later.
+    -> (return, ok); not ok if the window runs past the data or has a stale/suspect bar."""
+    j = i + hold
+    if j >= end or c[i] <= 0 or bad[i:j + 1].any():
+        return np.nan, False
+    return c[j] / c[i] - 1, True
+
+
+def add_close_entry(d: pd.DataFrame, big: pd.Series) -> pd.DataFrame:
+    """Rules e/f (design addendum): outcomes from the day-1 close, plus the day-1 reaction features."""
+    from features.us_earnings import Prices
+    from ingest.us.common import session
+    with session(read_only=True, memory_limit="6GB") as con:
+        P = Prices(con, sorted(set(d.ticker.dropna())) + ["SPY", "IWM"])
+    o, c = P.cols["open"], P.cols["close"]
+    res = {k: np.full(len(d), np.nan) for k in ["r_e", "r_f", "spy_e", "spy_f", "iwm_e", "iwm_f", "spy_1", "iwm_1"]}
+    bench = {}
+    for sym in ("SPY", "IWM"):
+        s0, e0 = P.span[sym]
+        bench[sym] = (s0, e0, {d_: k for k, d_ in enumerate(P.dates[s0:e0])})
+    for k, (t, day) in enumerate(zip(d.ticker, d.trade_date)):
+        i = P.locate(t, day)
+        if i is None:
+            continue
+        _, e = P.span[t]
+        for r, h in HOLD_CLOSE.items():
+            res[f"r_{r}"][k] = close_entry(o, c, P.bad, i, e, h)[0]
+        dd = np.datetime64(pd.Timestamp(day).date(), "D")
+        for sym in ("SPY", "IWM"):
+            s0, e0, pos = bench[sym]
+            if dd in pos:
+                bi = s0 + pos[dd]
+                res[f"{sym.lower()}_1"][k] = c[bi] / o[bi] - 1
+                for r, h in HOLD_CLOSE.items():
+                    res[f"{sym.lower()}_{r}"][k] = close_entry(o, c, P.bad, bi, e0, h)[0]
+    for k, v in res.items():
+        d[k] = v
+    for r in HOLD_CLOSE:
+        d[f"y_{r}"] = np.where(big, d[f"r_{r}"] - d[f"spy_{r}"], d[f"r_{r}"] - d[f"iwm_{r}"])
+    d["gap"] = d.entry_open / d.prev_close - 1
+    d["day1_ret"] = d.r_a
+    d["day1_x"] = d.r_a - np.where(big, d.spy_1, d.iwm_1)
+    return d
 
 
 # ---------------------------------------------------------------- walk-forward
@@ -127,7 +176,8 @@ def predict_years(d: pd.DataFrame, feats: list[str], rule: str, years: list[int]
     pred = pd.Series(np.nan, index=d.index)
     y = f"y_{rule}"
     for Y in years:
-        tr = d[(d.trade_date < pd.Timestamp(f"{Y - 1}-12-01")) & d[y].notna()]
+        embargo = f"{Y - 1}-10-01" if rule == "f" else f"{Y - 1}-12-01"     # holds must end before Y
+        tr = d[(d.trade_date < pd.Timestamp(embargo)) & d[y].notna()]
         te = d.year == Y
         m = lgb.LGBMRegressor(**LGB).fit(tr[feats].astype(float), tr[y].clip(-CLIP_Y, CLIP_Y))
         pred[te] = m.predict(d.loc[te, feats].astype(float))
@@ -140,7 +190,7 @@ def evaluate(d: pd.DataFrame, years: list[int]) -> tuple[pd.DataFrame, pd.DataFr
     pred_years = list(range(FIRST_PRED_YEAR, max(years) + 1))
     for name, feats in MODELS.items():
         for rule in RULES:
-            p = predict_years(d, feats, rule, pred_years)
+            p = predict_years(d, feats + (REACT if rule in HOLD_CLOSE else []), rule, pred_years)
             y = d[f"y_{rule}"]
             for Y in years:
                 cur = (d.year == Y) & y.notna()

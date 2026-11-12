@@ -24,3 +24,12 @@ def test_round_trip_cost_commission_capped_at_1pct_and_min_1usd():
 def test_final_years_locked_without_flag():
     with pytest.raises(SystemExit, match="once"):
         bt.run("final", final=False)
+
+
+def test_close_entry_holds_from_day1_close_and_rejects_bad_or_short_windows():
+    o = np.ones(30); c = np.arange(1, 31, dtype=float); bad = np.zeros(30, bool)
+    r, ok = bt.close_entry(o, c, bad, 2, 30, 20)
+    assert ok and abs(r - (23 / 3 - 1)) < 1e-12           # close of day index 2 -> close of index 22
+    assert not bt.close_entry(o, c, bad, 15, 30, 20)[1]    # runs past the data
+    bad[10] = True
+    assert not bt.close_entry(o, c, bad, 2, 30, 20)[1]     # stale bar inside the window
