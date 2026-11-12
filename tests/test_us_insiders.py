@@ -36,3 +36,17 @@ def test_parse_keeps_form4_rows_with_owner_roles(tmp_path):
 def test_quarters_run_from_2006_to_now():
     qs = quarters(date(2026, 11, 12))
     assert qs[0] == "2006q1" and qs[-1] == "2026q4" and len(qs) == 84
+
+
+def test_older_quarters_without_the_10b5_1_column(tmp_path):
+    p = _zip(tmp_path)
+    with zipfile.ZipFile(p) as z:
+        files = {n: z.read(n).decode() for n in z.namelist()}
+    lines = files["SUBMISSION.tsv"].splitlines()
+    files["SUBMISSION.tsv"] = "\n".join("\t".join(l.split("\t")[:-1]) for l in lines) + "\n"
+    q = tmp_path / "old.zip"
+    with zipfile.ZipFile(q, "w") as z:
+        for n, t in files.items():
+            z.writestr(n, t)
+    df = parse_quarter(q, "2006q1")
+    assert len(df) == 1 and df.iloc[0].aff10b5one is None or str(df.iloc[0].aff10b5one) in ("nan", "None", "<NA>")

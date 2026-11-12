@@ -41,9 +41,16 @@ def quarters(today: date | None = None) -> list[str]:
 
 
 def _read(z: zipfile.ZipFile, name: str, cols: list[str]) -> pd.DataFrame:
+    """Columns missing from older quarters (e.g. AFF10B5ONE, added 2023) come back empty."""
     with z.open(name) as f:
-        return pd.read_csv(io.TextIOWrapper(f, encoding="utf-8", errors="replace"), sep="\t", dtype=str,
-                           quoting=3, usecols=cols, keep_default_na=False)
+        have = f.readline().decode("utf-8", "replace").rstrip("\r\n").split("\t")
+    with z.open(name) as f:
+        df = pd.read_csv(io.TextIOWrapper(f, encoding="utf-8", errors="replace"), sep="\t", dtype=str,
+                         quoting=3, usecols=[c for c in cols if c in have], keep_default_na=False)
+    for c in cols:
+        if c not in df:
+            df[c] = ""
+    return df[cols]
 
 
 def parse_quarter(zpath, quarter: str) -> pd.DataFrame:
