@@ -53,3 +53,13 @@ Shorts (bottom decile, gross only) separately: they need a margin account and bo
 ## Known limits (flag in every report)
 Survivorship (delisted firms mostly missing) flatters results. Capacity: trades are assumed
 independent and fully funded, no limit on positions per day.
+
+## Addendum 2026-11-12 (added after the first choose-years run finished, BEFORE its results were opened)
+The user agreed to add a post-earnings-drift test. Two more exit rules, same models, selections and costs:
+- **(e)** buy at the **close of the first trading day** after the release, hold 20 trading days, sell at the close.
+- **(f)** the same, held 60 trading days.
+For (e) and (f) the model also sees the first day's reaction, which is known at that close:
+the opening gap (open vs previous close), the open-to-close return, and that return minus the
+benchmark's. Training rows must have ended before the predicted year (trade before 1 Oct of the
+previous year for 60-day holds). A window with a stale or suspect price, or that runs past the
+data, gives no outcome. No stop-loss (the drift literature holds through).
