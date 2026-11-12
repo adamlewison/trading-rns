@@ -42,7 +42,8 @@ then paper trading, then small size.
 - **Tried:** US earnings drift: **failed** the final test (section 6).
 - **Next:** insider buying (section 7). Waiting for the user's go-ahead.
 - **The user's account:** about $6,000, around $150 per trade, Trading 212, holds up to ~20 days.
-- If the last ~419 Luna labels arrive: `classify.labels build`, then `features.us_earnings_labels build`.
+- Droplet runner (`trading-rns-agent`) installed 2026-11-12: agents reach the droplet themselves (~6s a command).
+- If the last ~419 Luna labels arrive (155 small batches still at OpenAI, `luna-run` service waiting): `classify.labels build`, then `features.us_earnings_labels build`.
 
 ## 2. Working rules
 - **Stop at the end of each phase** (data → labels → features → backtest → live), report, and wait
