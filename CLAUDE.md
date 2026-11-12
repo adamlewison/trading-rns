@@ -39,9 +39,9 @@ then paper trading, then small size.
 ## 1. Status (2026-11-12)
 - **Data:** UK done (RNS announcements 2012–2026, prices for 874 tickers, SETS/SETSqx). US done
   (all 8-Ks 2012–2026 with text, XBRL facts, prices for 7,627 tickers, split histories).
-- **Tried (all failed, section 6):** US earnings drift and insider buying (final tests); no-news reversals and
-  the pre-earnings run-up (on 2019–2021; their final years unused).
-- **Next:** ETF trend-following (section 7). Waiting for the user's go-ahead.
+- **Tried (all failed, section 6):** US earnings drift and insider buying (final tests); no-news reversals,
+  the pre-earnings run-up and ETF trend-following (choose period; final years unused).
+- **Next:** user to choose between the options in section 7.
 - **The user's account:** about $6,000, around $150 per trade, Trading 212, holds up to ~20 days.
 - Droplet runner (`trading-rns-agent`) installed 2026-11-12: agents reach the droplet themselves (~6s a command).
 - If the last ~419 Luna labels arrive (155 small batches still at OpenAI, `luna-run` service waiting): `classify.labels build`, then `features.us_earnings_labels build`.
@@ -88,6 +88,8 @@ then paper trading, then small size.
 7. **In liquid US stocks the simple published effects are gone after costs:** post-earnings drift after
    the next open (2022–2026), short-term reversal after no-news falls and the pre-earnings run-up
    (2019–2021, both ≈0% before costs). Prefer strategies that trade rarely.
+11. **Trend-following lowers risk but lags buy-and-hold in bull markets** (2007–2021: 9.1% vs 10.8%/yr).
+    Beating the index needs a real edge, not just crash protection.
 8. **Survivorship:** almost no prices for delisted companies (US or UK); every result is flattered
    until that's fixed (paid options in section 10).
 9. **Infrastructure:** on the 1GB droplet every DuckDB connection needs `ROW_GROUP_SIZE 8192`
@@ -110,6 +112,7 @@ then paper trading, then small size.
 | US insider buying: Form 4 purchases by officers/directors at market prices (500k purchases, 2012–2026), 2 universes × 3 selections × 3 exits, $6k account | **Failed.** Buying every insider purchase or clusters lost to costs. The model's picks (mostly insider buys after big falls) beat the average event; the frozen setup (liquid, model, 20 days) won 2019–21 but lost $468 vs the market in 2022–26. Small-stock model picks were positive in 2022–26 but that's where survivorship bias is worst | `backtest/DESIGN_INSIDERS.md` |
 | US no-news reversals: liquid stocks falling ≥2.5σ vs the market with no 8-K, buy at the close or next open, hold 1–5 days or ATR bracket | **Failed on 2019–2021** (final years unused): no bounce on average (≈0% vs the market), the model didn't help, every variant lost every year after costs. Also says plain short-term dip-buying isn't what drove the insider picks | `backtest/DESIGN_REVERSALS.md` |
 | US pre-earnings run-up: buy 6 days before the expected release (last year's date + 364 days, right within ±3 days 72% of the time), sell before or just after it | **Failed on 2019–2021** (final years unused): ≈0% vs the market before costs, the model didn't help, every variant lost | `backtest/DESIGN_RUNUP.md` |
+| ETF trend-following / momentum (Faber GTAA-5, dual momentum, top-3-of-10, S&P timing), monthly, 2007–2021 | **Failed the pass rule** (beat holding the S&P 500): best 9.1%/yr vs 10.8% for SPY; halved the worst falls (−22% vs −55%) but lost through whipsaws in a long bull market | `backtest/DESIGN_ETF_TREND.md` |
 
 Both strategies' final years are spent: further work on them can only be judged live (paper trading)
 or with delisted prices. Open lead: the insider model's small-stock picks (worth a paper trial).
@@ -118,17 +121,13 @@ or with delisted prices. Open lead: the insider model's small-stock picks (worth
 
 | # | Strategy | Data | LLM cost | Why here |
 |---|---|---|---|---|
-| 1 | **ETF trend-following / momentum** | Yahoo ETF prices (free download) | none | Trades ~monthly, costs near zero at any size; a century of evidence; the single-stock effects keep dying on costs |
-| 2 | **US news drift** (deals, CEO exits, profit warnings) | have it (421,832 filings) | ~$140 | Only with a reason to expect a bigger effect than earnings |
-| 3 | **UK RNS news drift** | have it | pilot first | High costs |
+| 1 | **US news drift** (deals, CEO exits, profit warnings) | have it (421,832 filings) | ~$140 | Only with a reason to expect a bigger effect than earnings |
+| 2 | **UK RNS news drift** | have it | pilot first | High costs |
 
 
 Also: **UK director dealings** (RNS) is untested; the US result lowers its priority.
-1. **ETF trend-following / momentum.** Hold a few broad funds (US/intl stocks, bonds, gold, cash);
-   each month keep the ones trending up (time-series momentum) or the strongest (relative momentum).
-   Usually its gain is avoiding big crashes; beating an index fund after costs is the test.
-2. **US news drift.** The earnings pipeline on other 8-Ks; only with a reason to expect a bigger effect.
-3. **UK RNS news drift.** Data complete; costs are the problem. Market-maker file still pending.
+1. **US news drift.** The earnings pipeline on other 8-Ks; only with a reason to expect a bigger effect.
+2. **UK RNS news drift.** Data complete; costs are the problem. Market-maker file still pending.
 
 **Exit ideas** (tools applied per strategy, fixed before each test):
 - **A. Targets scaled to each stock's normal move (default):** target and stop as multiples of the

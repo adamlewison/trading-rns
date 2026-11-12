@@ -48,3 +48,10 @@ A strategy that only lowers risk but earns less fails the user's goal and is rep
 Few independent decisions (trend changes a handful of times a year) make results noisy. US ETF
 histories stand in for UCITS ones (small tracking and fee differences). Momentum suffered sharp
 reversals in some years (e.g. 2009 rebound, 2020 V-shape).
+
+## Choose-period result (2007-03 .. 2021-12, run 2026-11-12): fails the pass rule, no final test run
+After costs: SPY held 10.75%/yr (max fall −55%); V4 S&P timing 9.05% (−22%); V3 top-3 8.94% (−27%);
+60/40 8.78% (−32%); V2 dual momentum 5.62% (−35%); V1 GTAA-5 4.49% (−15%). Every trend strategy cut the
+worst fall by half or more (2008: V4 +6% vs SPY −36%) but earned less over the whole period through
+whipsaws in 2010, 2015–2016, 2018–2019. None beat buying and holding the S&P 500, so none was frozen and
+the final period was not used. Best risk-adjusted: 60/40 (Sharpe 0.82) and V4 (0.73) vs SPY (0.61).
