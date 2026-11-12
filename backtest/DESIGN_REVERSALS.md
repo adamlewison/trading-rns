@@ -48,3 +48,10 @@ Report per year: events, trades taken, gross excess, net, account $ vs the marke
 News we can't see (analyst downgrades, sector news, press releases without an 8-K). Short holds make
 results cost-sensitive. Survivorship: stocks that fell and later failed may be missing (smaller
 problem for liquid stocks and short holds).
+
+## Change 1 (2026-11-12, before any 2019–2021 result was seen)
+54% of 8-Ks with a known time are filed after the 16:00 close, so rule 3 removed many falls whose
+8-K came only after we'd have bought (hindsight). Now a day-t 8-K counts as news only if it was filed
+before 16:00 ET or its time is unknown (items we didn't download). Previous-day 8-Ks always count.
+Seen before the change: on the fit years 2012–2018 the average no-news fall kept falling (−0.3% vs the
+market over 5 days, close entry); nothing from 2019 on had been looked at.
