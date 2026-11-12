@@ -215,3 +215,25 @@ results look better than they really are is flagged with ⚠️.
   correct, because it undoes exactly what Yahoo applied to its own prices. Tickers whose Yahoo history
   is missing (warrants, delisted) get no splits, so their valuation ratios are wrong if they ever split;
   those rows are flagged rather than trusted.
+
+## Phase 3, second half: labels and valuation (2026-11-12)
+- **Labels** (`data/labels/us_earnings_labels.parquet`, GPT-6 Luna, prompt v4): 150,099 of 150,518 so
+  far (99.7%; the rest are being re-sent). Diluted EPS matches the later XBRL filing within 1 cent for
+  97.0% of 100,404 checkable releases, steady at 96–98% every year (2011: 93%, n=812). 37% of releases
+  were cut at 25,000 characters (the headline numbers come first, so the effect should be small).
+- **"vs consensus" is not usable:** 98% of releases don't mention analyst expectations. We have no
+  consensus data, so surprise is measured against the company's own history (SUE), not the market's
+  expectation. That is a weaker signal than real surprise, which is a known limitation, not a bias.
+- **SUE** = (EPS − prior-year EPS, both as printed in the release) / std of the company's last 8
+  seasonal EPS changes filed before the trade (needs ≥4). The prior-year figure is as restated in the
+  release, which is what the market saw. Clipped at ±10; 72% coverage.
+- **Guidance change** compares with the same company's latest EARLIER release that guided the same
+  period (FY or quarter + year, parsed from text) on the same EPS basis. Quarterly guidance is almost
+  always for a new quarter, so only 18,742 releases have a comparable earlier figure.
+- **Market cap** = prior close × split factor (undoing later splits) × shares. Shares: median of the
+  last 3 cover-page counts filed before the trade, each carried through later splits. Filers often
+  get the scale wrong, so: if it disagrees >3× with net income ÷ diluted EPS from the release itself, the
+  release's count is used (969 rows); counts above 30bn are dropped (17); caps outside $100k–$6tn
+  are dropped. 23k caps could not be cross-checked (no usable EPS) and are flagged `mcap_unchecked`.
+- **Ratio caps are fixed numbers, not sample percentiles** (percentiles would use future data):
+  earnings yield ±1, book/market −1..10, sales/price 0..50, guidance change ±2 (EPS) / ±1 (revenue).

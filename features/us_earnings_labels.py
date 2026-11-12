@@ -28,8 +28,13 @@ log = get_logger("features")
 FEAT = ROOT / "data" / "features"
 LABELS = ROOT / "data" / "labels" / "us_earnings_labels.parquet"
 SUE_CLIP = 10.0
+SHARES_MAX = 3e10
+MCAP_MIN, MCAP_MAX = 1e5, 6e12          # outside this the share count is a filing error
+# fixed caps (not sample quantiles, which would use the future): ratios on tiny or broken bases
+CLIPS = {"earnings_yield": (-1, 1), "book_to_market": (-1, 10), "sales_to_price": (0, 50),
+         "guid_eps_chg": (-2, 2), "guid_rev_chg": (-1, 1), "rev_yoy": (-1, 10)}
 
-LABEL_COLS = ["is_earnings_release", "fiscal_period", "vs_consensus", "guidance_given", "guidance_change_stated",
+LABEL_COLS = ["net_income_m", "is_earnings_release", "fiscal_period", "vs_consensus", "guidance_given", "guidance_change_stated",
               "guidance_eps_basis", "tone", "confidence", "n_events", "revenue_m", "revenue_prior_year_m",
               "eps_diluted_gaap", "eps_diluted_gaap_prior_year", "eps_adjusted", "eps_adjusted_prior_year",
               "guidance_period", "guidance_eps_low", "guidance_eps_high", "guidance_revenue_low_m",
@@ -109,22 +114,28 @@ def valuation(con, ev: pd.DataFrame) -> pd.DataFrame:
     e = ev[["accession", "cik", "ticker", "trade_date", "prev_close"]].dropna().copy()
     e["trade_date"] = pd.to_datetime(e.trade_date)
     con.register("e", e[["accession", "cik", "trade_date"]])
+    # the last 3 share counts reported before the trade, each carried through later splits, and
+    # their median: single filings with the wrong scale (thousands vs units) are common
     sh = con.execute("""
         WITH f AS (SELECT cik, end_date, min(filed) filed, arg_min(val, filed) val FROM us_facts
-                   WHERE concept = 'EntityCommonStockSharesOutstanding' AND val > 0 GROUP BY ALL)
-        SELECT e.accession, arg_max(f.val, f.end_date) shares, max(f.end_date) shares_date
-        FROM e JOIN f ON f.cik = e.cik AND f.filed < e.trade_date AND f.end_date > e.trade_date - INTERVAL 200 DAY
-        GROUP BY 1""").df()
-    e = e.merge(sh, on="accession", how="left")
-    e["shares_date"] = pd.to_datetime(e.shares_date)
-    e = e.reset_index(drop=True)
+                   WHERE concept = 'EntityCommonStockSharesOutstanding' AND val > 0 GROUP BY ALL),
+        j AS (SELECT e.accession, f.val shares, f.end_date shares_date,
+                     row_number() OVER (PARTITION BY e.accession ORDER BY f.end_date DESC) rn
+              FROM e JOIN f ON f.cik = e.cik AND f.filed < e.trade_date
+                   AND f.end_date > e.trade_date - INTERVAL 400 DAY)
+        SELECT accession, shares, shares_date, rn FROM j WHERE rn <= 3""").df()
+    sh["shares_date"] = pd.to_datetime(sh.shares_date)
+    sh = sh.merge(e[["accession", "ticker", "trade_date"]], on="accession").reset_index(drop=True)
+    sh["adj"] = sh.shares * split_factor(splits, sh, "shares_date", "trade_date")
+    agg = sh.groupby("accession").agg(shares_then=("adj", "median"), shares_n=("adj", "size"),
+                                      shares_date=("shares_date", "max")).reset_index()
+    e = e.merge(agg, on="accession", how="left").reset_index(drop=True)
     # prices are adjusted for every split up to today: undo those after the day before the trade
     # (a split effective on the trade date already adjusted the prior close, so "after the day before")
     e["price_then"] = e.prev_close * split_factor(splits, e.assign(t0=e.trade_date - pd.Timedelta(days=1)), "t0")
-    e["shares_then"] = e.shares * split_factor(splits, e, "shares_date", "trade_date")
-    e["mcap"] = e.price_then * e.shares_then
+    e["mcap"] = (e.price_then * e.shares_then).where(lambda m: m.between(MCAP_MIN, MCAP_MAX))
     e["has_split_history"] = e.ticker.isin(set(splits.ticker))
-    return e[["accession", "price_then", "shares_then", "shares_date", "mcap", "has_split_history"]]
+    return e[["accession", "price_then", "shares_then", "shares_n", "shares_date", "mcap", "has_split_history"]]
 
 
 # ---------------------------------------------------------------- build
@@ -149,6 +160,18 @@ def build() -> pd.DataFrame:
     df = df.merge(guidance_changes(df), on="accession", how="left")
     with session(read_only=True, memory_limit="6GB") as con:
         df = df.merge(valuation(con, df), on="accession", how="left")
+    # cross-check: shares implied by the release itself (net income / diluted EPS). Where the cover-page
+    # count disagrees by more than 3x, the cover page has the wrong scale: use the implied count.
+    ok = (df.eps_diluted_gaap.abs() >= 0.05) & (np.sign(df.net_income_m) == np.sign(df.eps_diluted_gaap))
+    implied = (df.net_income_m * 1e6 / df.eps_diluted_gaap).where(ok)
+    ratio = df.shares_then / implied
+    bad = ratio.notna() & ((ratio > 3) | (ratio < 1 / 3))
+    df["shares_source"] = np.where(bad, "release", np.where(df.shares_then.notna(), "cover", None))
+    df.loc[bad, "shares_then"] = implied[bad]
+    # no US company has had more than ~26bn shares (Apple 2013, split-adjusted): larger is a scale error
+    df.loc[df.shares_then > SHARES_MAX, ["shares_then", "shares_source"]] = [np.nan, "implausible"]
+    df["mcap"] = (df.price_then * df.shares_then).where(lambda m: m.between(MCAP_MIN, MCAP_MAX))
+    df["mcap_unchecked"] = df.mcap.notna() & ratio.isna()
     with np.errstate(divide="ignore", invalid="ignore"):
         df["log_mcap"] = np.log(df.mcap.where(df.mcap > 0))
         df["earnings_yield"] = df.get("ni_fy") / df.mcap
@@ -156,6 +179,8 @@ def build() -> pd.DataFrame:
         df["sales_to_price"] = df.get("rev_fy") / df.mcap
         df["eps_yoy_to_price"] = (df.eps_yoy / df.price_then).clip(-1, 1)
     df = df.replace([np.inf, -np.inf], np.nan)
+    for c, (lo, hi) in CLIPS.items():
+        df[c] = df[c].clip(lo, hi)
     path = FEAT / "us_earnings_model.parquet"
     df.to_parquet(path)
     log.info("model table: %d rows x %d columns; labelled %d; sue %d; guidance change %d; mcap %d -> %s",

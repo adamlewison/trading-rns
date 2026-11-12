@@ -96,7 +96,7 @@ def report() -> str:
         lines.append(f"{k}: " + json.dumps({str(a): int(b) for a, b in lab[k].value_counts().items()}))
     ev = {t: int(lab[f"ev_{t}"].sum()) for t in ue.EVENTS}
     lines += ["events: " + json.dumps(dict(sorted(ev.items(), key=lambda x: -x[1]))), ""]
-    x = ue.xbrl_check(lab, df[["accession", "cik"]])
+    x = ue.xbrl_check(lab.drop(columns="cik"), df[["accession", "cik"]])
     if len(x):
         x["year"] = pd.to_datetime(x.period_end).dt.year
         by = x.groupby("year").match.agg(["mean", "size"])
