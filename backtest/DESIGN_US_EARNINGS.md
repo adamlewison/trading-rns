@@ -103,3 +103,12 @@ If it fails here, it is not tuned further on these years.
 **Result (2026-11-12): fails.** Picks vs market before costs +0.61% / +1.03% / −0.48% per trade
 (2019/2020/2021). Trading 212: −$64 / +$189 / −$576 vs the market on $6,000; IBKR fixed: −$440 /
 −$538 / −$1,038. Not tuned further on these years, as written above.
+
+## FROZEN for the final test (2026-11-12, the user agreed to 20-day holds)
+Exactly addendum 3, with the hold changed to **20 trading days (rule e)**:
+liquid universe (≥ $20m/day), model L + day-1 reaction, walk-forward (train on everything before
+1 Dec of the previous year), S2 (above last year's top-decile prediction), $150 per position, at most
+40 open ($6,000), best prediction first within a day, skipped when full. Costs: Trading 212 (primary)
+and IBKR fixed, spread table; Corwin–Schultz as the pessimistic check. Run ONCE on 2022–2026
+(`backtest.us_account final --final --hold 20`). The same setup on 2019–2021 is printed beside it
+for comparison only. Whatever the result, it is reported as is and the setup is not changed and re-run.

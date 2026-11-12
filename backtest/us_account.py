@@ -16,7 +16,8 @@ from backtest import us_earnings as bt
 from core.log import get_logger
 
 log = get_logger("backtest")
-SIZE, SLOTS, HOLD = 150.0, 40, 10
+SIZE, SLOTS = 150.0, 40
+RULE_OF = {10: "g", 20: "e"}                  # hold days -> rule letter
 BROKERS = {
     "trading212": dict(min_comm=0.0, per_share=0.0, max_pct=0.0, fx=0.0015, slip=0.0015),
     "ibkr_fixed": dict(min_comm=1.0, per_share=0.005, max_pct=0.01, fx=0.0003, slip=0.0010),
@@ -49,20 +50,22 @@ def simulate(x: pd.DataFrame, slots: int = SLOTS) -> pd.DataFrame:
     return x.assign(taken=take)
 
 
-def run(stage: str, final: bool = False) -> str:
+def run(stage: str, final: bool = False, hold: int = 10) -> str:
     if stage == "final" and not final:
         raise SystemExit("the test years are run once, after the user's OK: add --final")
     years = bt.CHOOSE if stage == "choose" else [2022, 2023, 2024, 2025, 2026]
-    bt.HOLD_CLOSE["g"] = HOLD
+    r = RULE_OF[hold]
+    bt.HOLD_CLOSE[r] = hold
     d = bt.load(final=(stage == "final"), min_dvol=bt.UNIVERSES["liquid"])
-    p = bt.predict_years(d, bt.L + bt.REACT, "g", list(range(bt.FIRST_PRED_YEAR, max(years) + 1)))
+    p = bt.predict_years(d, bt.L + bt.REACT, r, list(range(bt.FIRST_PRED_YEAR, max(years) + 1)))
     d["pred"] = p
     rows = []
     for Y in years:
         cut = p[d.year == Y - 1].quantile(0.9)
-        rows.append(d[(d.year == Y) & d.y_g.notna() & (p > cut)])
+        rows.append(d[(d.year == Y) & d[f"y_{r}"].notna() & (p > cut)])
     x = pd.concat(rows)
-    x["exit_date"] = x.trade_date + pd.offsets.BDay(HOLD)
+    x["exit_date"] = x.trade_date + pd.offsets.BDay(hold)
+    x["y_g"], x["r_g"] = x[f"y_{r}"], x[f"r_{r}"]          # outcome of the chosen hold
     x = simulate(x)
     tab = spread_table(x.dollar_vol_20d.to_numpy())
     cs = x.spread_cs.fillna(bt.SPREAD_FALLBACK).to_numpy()
@@ -82,14 +85,14 @@ def run(stage: str, final: bool = False) -> str:
         out.append(row)
     res = pd.DataFrame(out)
     bt.OUT.mkdir(parents=True, exist_ok=True)
-    res.to_parquet(bt.OUT / f"us_account_{stage}.parquet")
-    x.to_parquet(bt.OUT / f"us_account_{stage}_signals.parquet")
-    return report(res)
+    res.to_parquet(bt.OUT / f"us_account_{stage}_{hold}d.parquet")
+    x.to_parquet(bt.OUT / f"us_account_{stage}_{hold}d_signals.parquet")
+    return report(res, hold)
 
 
-def report(res: pd.DataFrame) -> str:
+def report(res: pd.DataFrame, hold: int) -> str:
     acct = SIZE * SLOTS
-    lines = [f"# Account test: ${SIZE:.0f}/trade, max {SLOTS} open (${acct:,.0f}), hold {HOLD} days", ""]
+    lines = [f"# Account test: ${SIZE:.0f}/trade, max {SLOTS} open (${acct:,.0f}), hold {hold} days", ""]
     for _, r in res.iterrows():
         lines.append(f"{int(r.year)}: {int(r.taken)} trades of {int(r.signals)} signals; picks vs market before "
                      f"costs {r.gross_x_pct:+.2f}% per trade")
@@ -104,8 +107,9 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("stage", choices=["choose", "final"])
     ap.add_argument("--final", action="store_true")
+    ap.add_argument("--hold", type=int, choices=list(RULE_OF), default=10)
     a = ap.parse_args()
-    print(run(a.stage, a.final))
+    print(run(a.stage, a.final, a.hold))
 
 
 if __name__ == "__main__":
