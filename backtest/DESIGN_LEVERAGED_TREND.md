@@ -38,3 +38,12 @@ Sharpe. A worse worst-fall than SPY's is flagged even if the strategy passes.
 A crash that happens faster than the signal can react (1987-style, 2020-style) is twice as painful.
 Choppy, trendless years cause repeated switching losses and leveraged drag. Real leveraged funds
 can differ from the model (financing, tracking); the fee and spread assumptions are estimates.
+
+## Choose-period result (1994-01 .. 2021-12, run 2026-11-12)
+After costs, a year: **L1 2× monthly 16.3%** (worst fall −40%, 34 switches in 28 years); L3 1.5× monthly
+13.2% (−31%); L2 2× 200-day 12.9% (−46%, 184 switches); SPY held 10.7% (−55%); 2× held 14.4% (−88%);
+1× monthly 10.2% (−21%). All three timed strategies beat holding SPY with a smaller worst fall.
+The cost: losing years when SPY rose (whipsaws): L1 −15% in 1994, −10% 2010, −11% 2011, −19% 2015,
+−19% 2018; it avoided 2001–2002 and 2008 (+1% in 2008 vs SPY −36%).
+Caveats: leveraged ETFs only exist from 2006, so earlier years use the modelled fund; 3 variants were
+compared. Next: the user chooses which one to freeze for the one-time final test (2022 → latest).
