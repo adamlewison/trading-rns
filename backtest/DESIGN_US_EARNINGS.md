@@ -112,3 +112,9 @@ liquid universe (≥ $20m/day), model L + day-1 reaction, walk-forward (train on
 and IBKR fixed, spread table; Corwin–Schultz as the pessimistic check. Run ONCE on 2022–2026
 (`backtest.us_account final --final --hold 20`). The same setup on 2019–2021 is printed beside it
 for comparison only. Whatever the result, it is reported as is and the setup is not changed and re-run.
+
+## FINAL TEST RESULT (2026-11-12, run once): fails
+Picks vs market before costs per trade: 2022 +0.91%, 2023 −1.10%, 2024 −0.17%, 2025 −0.40%, 2026 +1.32%
+(about +0.1% on average, i.e. no edge). Trading 212, vs the market on $6,000: +$61, −$596, −$400, −$522, +$174
+(−$1,283 over five years). Actual account: −$151, −$401, +$471, +$41, +$393 (+$353 over five years, far
+below an index fund). IBKR fixed: worse every year. The 2019–2021 edge did not hold up out of sample.
