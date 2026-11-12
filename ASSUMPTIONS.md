@@ -208,3 +208,10 @@ results look better than they really are is flagged with ⚠️.
 - **Sanity check:** the average 5-day return net of SPY across all releases is about zero (−0.1%),
   as expected if there's no look-ahead in the pipeline. Extreme values (±300% days) exist and need
   price/liquidity filters before any backtest.
+
+- **Split histories (US, 2026-11-12):** `us_splits` from Yahoo. Yahoo prices are split-adjusted to
+  today; the price as it was on a date = close × product of the ratios of all later splits. Yahoo also
+  records some spin-offs as fractional "splits" (e.g. Agilent 2014, 1.398). Undoing them is still
+  correct, because it undoes exactly what Yahoo applied to its own prices. Tickers whose Yahoo history
+  is missing (warrants, delisted) get no splits, so their valuation ratios are wrong if they ever split;
+  those rows are flagged rather than trusted.

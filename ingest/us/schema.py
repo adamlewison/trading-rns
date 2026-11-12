@@ -42,6 +42,12 @@ CREATE TABLE IF NOT EXISTS us_price_download_log (
     ticker VARCHAR, yahoo_ticker VARCHAR, attempted_at TIMESTAMP, status VARCHAR,
     n_rows INTEGER, first_date DATE, last_date DATE, error VARCHAR
 );
+CREATE TABLE IF NOT EXISTS us_splits (            -- Yahoo split events; ratio 4.0 = 4-for-1
+    ticker VARCHAR, date DATE, ratio DOUBLE
+);
+CREATE TABLE IF NOT EXISTS us_split_log (
+    ticker VARCHAR, attempted_at TIMESTAMP, status VARCHAR, n_splits INTEGER, error VARCHAR
+);
 CREATE TABLE IF NOT EXISTS us_progress (
     key VARCHAR PRIMARY KEY, status VARCHAR, n INTEGER, updated_at TIMESTAMP
 );
