@@ -36,3 +36,10 @@ prediction), skipped when full. Benchmark SPY if market cap ≥ $10bn else IWM. 
 ## Known risks
 The edge is small (tenths of a percent), so costs decide it. Survivorship (companies that later
 failed have no prices) is milder here (liquid stocks, one-week holds) but still flatters.
+
+## Choose-years result (2019–2021, run 2026-11-12): fails, no final test run
+Forecast of the release date within ±3 trading days: 72%. Fit years 2013–2018 (seen before the run):
++0.02% (W1) and +0.15% (W2) vs the market per event, before costs. 2019–2021: gross −0.03% to +0.08%
+per event in every universe/selection; the model's picks no better. All 8 variants lost to the market
+after costs (Trading 212: −$1,100 to −$4,100 over three years on $6,000); none was positive in more than
+one year. The final years were not used.
