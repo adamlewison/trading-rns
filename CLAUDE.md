@@ -4,9 +4,28 @@
 fund.** Not tied to any market, data source or idea. When a track fails, record why here and switch
 tracks. We don't stop until one passes.
 
-This is the only project doc. Keep it current: add every lesson, result and change of plan here.
-Each tested strategy also gets a design file written before it runs (e.g.
-`backtest/DESIGN_US_EARNINGS.md`), kept as the record of that test.
+## How to use this doc (every agent, Claude or not)
+This is the **only** project doc (`AGENTS.md` is a link to it). Read it fully before starting work.
+It is the project's memory: what isn't written here is lost between sessions.
+
+**Update it as you work, not at the end.** Whenever you learn or decide something, write it here
+in the same commit as the work:
+- a **result** of a test → section 6 (what we've tried), one row, with the record file;
+- a **lesson** (something that would change how we work next time) → section 4;
+- a **new idea or strategy** → section 7, placed in priority order with a one-line reason;
+- a **finding about the data or a bias** → section 8;
+- **status**, the user's preferences (account size, broker, hold length) and what's waiting → section 1;
+- new **commands, files or infrastructure** → section 9.
+
+**Keep it short and useful.** Aim to stay under ~250 lines. When you add something, also tidy:
+- summarise older or finished material to a line or two (details stay in git history and the
+  test's design file);
+- merge duplicates, delete what's no longer true, keep numbers that matter;
+- prefer one clear sentence to a paragraph; write for a reader with no memory of past sessions.
+
+Each tested strategy also gets a design file written and committed before it runs (e.g.
+`backtest/DESIGN_US_EARNINGS.md`): the proof that rules weren't changed after seeing results.
+Summarise its outcome here; the file itself is the record.
 
 **How we work.** Claude brings a broad knowledge of the trading literature, statistics, market
 microstructure and what traders have done before, and uses it to choose ideas with a real chance
