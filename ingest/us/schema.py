@@ -48,6 +48,14 @@ CREATE TABLE IF NOT EXISTS us_splits (            -- Yahoo split events; ratio 4
 CREATE TABLE IF NOT EXISTS us_split_log (
     ticker VARCHAR, attempted_at TIMESTAMP, status VARCHAR, n_splits INTEGER, error VARCHAR
 );
+CREATE TABLE IF NOT EXISTS us_insider_tx (       -- Form 4 non-derivative transactions (SEC data sets)
+    accession VARCHAR, quarter VARCHAR, filing_date DATE, doc_type VARCHAR, issuer_cik BIGINT,
+    issuer_name VARCHAR, issuer_ticker VARCHAR, owner_ciks VARCHAR, owner_names VARCHAR,
+    relationship VARCHAR, titles VARCHAR, is_director INTEGER, is_officer INTEGER, is_ten_pct INTEGER,
+    n_owners INTEGER, aff10b5one BOOLEAN, trans_sk BIGINT, security_title VARCHAR, trans_date DATE,
+    trans_code VARCHAR, acq_disp VARCHAR, shares DOUBLE, price DOUBLE, shares_after DOUBLE,
+    direct_indirect VARCHAR
+);
 CREATE TABLE IF NOT EXISTS us_progress (
     key VARCHAR PRIMARY KEY, status VARCHAR, n INTEGER, updated_at TIMESTAMP
 );
