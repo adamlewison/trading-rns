@@ -1,62 +1,44 @@
-# trading-rns: trade the drift after company news
+# trading-rns
 
-**Goal: an automated trading system that makes money after costs.** It isn't tied to one market or
-one strategy; whatever wins in an honest backtest gets traded.
+**Goal: find an automated trading strategy that makes money after costs and beats an index fund.**
+Not tied to a market or an idea: when one fails we record why and move to the next.
 
-The first strategy being tested: a company publishes news outside market hours, Claude reads and
-labels it, a model scores it together with the company's financials, the earnings surprise and the
-price reaction, and strong signals are bought at the open. It must beat a no-Claude baseline, and
-only a few exit rules written down in advance are tested. **[`PLAN.md`](PLAN.md) has the full design.**
+| Read | For |
+|---|---|
+| [`PLAN.md`](PLAN.md) | the goal, what we've learnt, what we've tried, what's next, the testing rules |
+| [`ASSUMPTIONS.md`](ASSUMPTIONS.md) | the data and every bias that could flatter results |
+| [`backtest/DESIGN_US_EARNINGS.md`](backtest/DESIGN_US_EARNINGS.md) | the US earnings test: design, changes, result |
+| this file | layout and commands |
 
-Two candidate markets, built the same way and judged on the same terms:
-- **US** (SEC 8-K filings, IBKR execution): low costs (no stamp duty, tight spreads, $0.005/share),
-  continuous order books, and free, official, timestamped filings. Competition is fiercer, so any
-  edge may be smaller.
-- **UK** (RNS announcements on AIM / small caps): possibly a bigger underreaction, but stamp duty
-  on non-AIM shares, 2–3% spreads, and thin fills on small caps.
+## Status (2026-11-12)
 
-The aim is an honest answer. Every assumption that might flatter results is listed in
-[`ASSUMPTIONS.md`](ASSUMPTIONS.md). Read it before trusting any number.
-
-## Status
-
-| Phase | What | UK | US |
-|---|---|---|---|
-| 1 | Data collection | done | earnings done; news downloading |
-| 2 | LLM classification | not started | pilot built (`classify/us_earnings.py`) |
-| 3 | Features & labels | not started | not started |
-| 4 | Backtest | not started | not started |
-| 5 | Live alerts | only if the backtest says so | |
+| Step | UK | US |
+|---|---|---|
+| Data | done (RNS 2012–2026, prices, SETS/SETSqx) | done (8-Ks 2012–2026, XBRL facts, prices, splits) |
+| LLM labels | not started | earnings releases done (GPT-6 Luna, $49) |
+| US earnings drift backtest | – | **failed** the final test (2022–2026) |
+| Next | | insider buying (see `PLAN.md`) |
 
 ## Layout
 
 ```
-PLAN.md            the design: inputs, phases, exit rules, guards against overfitting
+PLAN.md            the goal, what we've learnt, what we've tried, what's next, testing rules
+ASSUMPTIONS.md     data details and every bias that could flatter results
 config.yaml        all settings: shared ones first, then one section per market (uk:, us:)
-core/              market-agnostic engine
-  config.py          load config.yaml + .env; market("uk"|"us") gives one market's settings
-  db.py              DuckDB connections (one writer per file, waits for the lock)
-  http.py            polite cached HTTP client: honest UA, robots.txt, rate limit, stops on refusals
-  backup.py          incremental Backblaze B2 backup / restore / remote status, per market
-  log.py
-ingest/            Phase 1 data collection
-  shared/prices.py   Yahoo daily prices: tidy + stale/suspect flags (both markets)
-  uk/                LSE universe, prices, RNS announcements (Investegate), SETS/SETSqx
-  us/                SEC EDGAR 8-K filings, documents, company facts, prices
-    each market has the same shape:
-      common.py        its config, database session and HTTP client
-      schema.py        its tables
-      backup.py        what it backs up + its remote status report
-      run_all.sh       every step in order (resumable)
-classify/          Phase 2: anonymise.py (strip names/tickers/URLs), us_earnings.py (US pilot:
-                   prepare / submit / fetch / report; runs in data/llm/<run>/, backed up to B2)
-features/ backtest/ live/    Phases 3–5 (not started)
-deploy/            droplet setup: setup-uk.sh, setup-us.sh, backup-loop.sh, cloud-init.yaml,
-                   migrate-layout.sh (one-time move of older checkouts to this layout)
-tests/             pytest, mirroring the code: core/, shared/, uk/, us/
+core/              config, DuckDB connections, polite HTTP client, B2 backup, logging
+ingest/            data collection: shared/prices.py, uk/ (LSE, Investegate RNS, SETS/SETSqx),
+                   us/ (EDGAR 8-Ks, documents, XBRL facts, Yahoo prices and splits)
+classify/          LLM labelling: anonymise.py, us_earnings*.py (prompt, Haiku runner),
+                   openai_full.py (GPT-6 Luna batch runner), labels.py (results -> labels table)
+features/          us_earnings.py (events, outcomes, price context, financials),
+                   us_earnings_labels.py (labels, SUE, guidance change, valuation)
+backtest/          us_earnings.py (walk-forward, 6 rules x 3 models), us_account.py ($6k account),
+                   DESIGN_US_EARNINGS.md (the test's design, every change, and the result)
+deploy/            droplet setup scripts and the backup loop
+tests/             pytest
 ```
 
-Each market has its own database and raw-download cache, so the two never contend for a lock:
+Each market has its own database and raw-download cache:
 
 | | UK | US |
 |---|---|---|
@@ -229,12 +211,16 @@ Checkouts from before the UK/US layout (with `data/rns.duckdb`) are moved over o
 `git pull && bash deploy/migrate-layout.sh`, **after** the UK scrape has finished. It refuses to
 run while the scrape is running.
 
-## Phase 2: Claude labels (US earnings pilot)
+## Labels, features and backtests (US earnings)
 
+```bash
+uv run python -W ignore -m classify.openai_full estimate|run --max-gbp 55|status   # Luna batch run (resumable)
+uv run python -W ignore -m classify.labels build|report        # results -> data/labels/, quality report
+uv run python -W ignore -m features.us_earnings build          # events, outcomes, context
+uv run python -W ignore -m features.us_earnings_labels build   # + labels, SUE, guidance, valuation
+uv run python -W ignore -m ingest.us.run splits                # split histories (droplet)
+uv run python -W ignore -m backtest.us_earnings choose [--universe liquid]   # 2019-2021
+uv run python -W ignore -m backtest.us_account choose --hold 20              # the $6k account
+# final tests need --final and run once per strategy, with the setup frozen in its design file
 ```
-uv run python -m classify.us_earnings prepare            # sample 500 + 50 leak checks, anonymise, estimate (no API)
-uv run python -m classify.us_earnings submit data/llm/<run>   # 1 test call, then the batch (refuses above £5 without --yes-spend)
-uv run python -m classify.us_earnings fetch  data/llm/<run>   # waits, stores raw results, copies the run to B2
-uv run python -m classify.us_earnings report data/llm/<run>   # fill rates, EPS vs XBRL, leak rate, real cost
-```
-Needs an Anthropic API key (environment network secret for api.anthropic.com, never in .env or chat).
+

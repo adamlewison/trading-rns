@@ -1,5 +1,8 @@
 # Phase 4 design: US earnings (written 2026-11-12, BEFORE any result was looked at)
 
+> **Outcome: FAILED** the one-time final test on 2022–2026 (see the end). Kept as the record of how
+> the test was designed, every change made, and the results. Lessons are in `PLAN.md`.
+
 Fixed here so that results can't shape the design. Anything changed after a result is seen gets
 listed in the results report as a change, with the reason.
 
