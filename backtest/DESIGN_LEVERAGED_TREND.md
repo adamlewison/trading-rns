@@ -47,3 +47,9 @@ The cost: losing years when SPY rose (whipsaws): L1 −15% in 1994, −10% 2010,
 −19% 2018; it avoided 2001–2002 and 2008 (+1% in 2008 vs SPY −36%).
 Caveats: leveraged ETFs only exist from 2006, so earlier years use the modelled fund; 3 variants were
 compared. Next: the user chooses which one to freeze for the one-time final test (2022 → latest).
+
+## FROZEN for the final test (2026-11-12, user chose L1)
+**L1:** 2× modelled S&P 500 fund (daily reset, financing at T-bill + 0.30%, 0.75%/yr fee) when SPY's
+month-end close is above its 10-month average, else T-bills; switch at the next day's close; 0.30% per
+side per switch. Run ONCE on 2022-01 → latest data with `backtest.leveraged_trend final --final`.
+Pass = higher total return than SPY held over that period. Not changed or re-run afterwards.
