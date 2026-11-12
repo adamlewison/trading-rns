@@ -87,3 +87,13 @@ H20 (hold 20 trading days)**, $150 × 40-slot account, Trading 212 (primary) and
 above. Run ONCE on 2022 – 2026 Q1 (latest SEC data) with `backtest.us_insiders final --final`. The
 verdict is this one row; the other 17 variants are printed for information only. Not changed or
 re-run afterwards.
+
+## FINAL TEST RESULT (2022 – 2026 Q1, run once, 2026-11-12): fails
+Frozen setup (liquid + model + 20 days), Trading 212, vs the market on $6,000: 2022 −$340, 2023 +$11,
+2024 +$78, 2025 +$220, 2026 Q1 −$437 → **−$468 over the period** (actual account +$506, far below an
+index fund). IBKR: −$1,968. The picks beat the average event in 2023–2025 but not by enough to pay
+costs, and lost badly in 2022 and early 2026.
+For information only (not a verdict, 18 variants): the model's picks in **small** stocks (U1 + S2)
+were positive vs the market in this period for every exit (trailing stop +$3,232, 4 of 5 years; 60 days
++$616; 20 days +$761). That is where survivorship bias is strongest (failed small companies have no
+prices), so it can't be trusted without delisted prices or live paper trading.

@@ -39,12 +39,8 @@ then paper trading, then small size.
 ## 1. Status (2026-11-12)
 - **Data:** UK done (RNS announcements 2012–2026, prices for 874 tickers, SETS/SETSqx). US done
   (all 8-Ks 2012–2026 with text, XBRL facts, prices for 7,627 tickers, split histories).
-- **Tried:** US earnings drift: **failed** the final test (section 6).
-- **Now:** insider buying. Data done 2026-11-12: `us_insider_tx` = 7.09m Form 4 transactions, 837k purchases,
-  2006 Q1 – 2026 Q1 (SEC hadn't published 2026 Q2 yet; `ingest.us.run insiders --refresh` adds new quarters).
-  Design: `backtest/DESIGN_INSIDERS.md`. **2019–2021 result:** only liquid stocks + model picks + 20-day hold beat the
-  market after costs every year (+$662 over 3 years on $6k); the rest mostly lost. Next: user decides whether to
-  freeze that setup for the one-time 2022–2026 test.
+- **Tried:** US earnings drift and US insider buying: both **failed** their final tests (section 6).
+- **Next:** no-news reversals (section 7). Waiting for the user's go-ahead.
 - **The user's account:** about $6,000, around $150 per trade, Trading 212, holds up to ~20 days.
 - Droplet runner (`trading-rns-agent`) installed 2026-11-12: agents reach the droplet themselves (~6s a command).
 - If the last ~419 Luna labels arrive (155 small batches still at OpenAI, `luna-run` service waiting): `classify.labels build`, then `features.us_earnings_labels build`.
@@ -94,6 +90,8 @@ then paper trading, then small size.
 9. **Infrastructure:** on the 1GB droplet every DuckDB connection needs `ROW_GROUP_SIZE 8192`
    (`core.db.connect`); OpenAI batches stall or expire after 24h, so runners must resume and survive
    refused calls; run long droplet jobs with `systemd-run ... -p Restart=on-failure`.
+10. **Models drift towards beaten-down, volatile stocks** (they had the biggest past rebounds). Such edges
+    depend on the market regime (2020 rebound) and are the most flattered by missing failed companies.
 
 ## 5. Markets compared
 - **US** (SEC 8-Ks, Trading 212 or IBKR): free, official, timestamped filings; no stamp duty;
@@ -106,31 +104,28 @@ then paper trading, then small size.
 | Strategy | Result | Record |
 |---|---|---|
 | US earnings drift: Luna-labelled releases, LightGBM model scores them, 6 exit rules × 3 models, then the $6k account | **Failed.** Labels improved the ranking but the edge was smaller than costs; the best setup (liquid stocks, buy at the release day's close, hold 20 days, $150 × 40) lost to the market by $1,283 over 2022–2026 | `backtest/DESIGN_US_EARNINGS.md` |
+| US insider buying: Form 4 purchases by officers/directors at market prices (500k purchases, 2012–2026), 2 universes × 3 selections × 3 exits, $6k account | **Failed.** Buying every insider purchase or clusters lost to costs. The model's picks (mostly insider buys after big falls) beat the average event; the frozen setup (liquid, model, 20 days) won 2019–21 but lost $468 vs the market in 2022–26. Small-stock model picks were positive in 2022–26 but that's where survivorship bias is worst | `backtest/DESIGN_INSIDERS.md` |
 
-Earnings drift's final years are spent; any further work on it can only be judged live (paper).
+Both strategies' final years are spent: further work on them can only be judged live (paper trading)
+or with delisted prices. Open lead: the insider model's small-stock picks (worth a paper trial).
 
 ## 7. What's next, in priority order
 
 | # | Strategy | Data | LLM cost | Why here |
 |---|---|---|---|---|
-| 1 | **Insider buying** (US + UK) | US: `us_insider_tx` (downloaded); UK director dealings in RNS | none | Strongest published evidence; few trades so costs hardly matter; fits a small pot |
-| 2 | **No-news reversals** | have it | none | Cheap to test |
-| 3 | **Run-up before scheduled earnings** | have it | none | Cheap; small edge, liquid stocks only |
-| 4 | **US news drift** (deals, CEO exits, profit warnings) | have it (421,832 filings) | ~$140 | Only if 1–3 find nothing |
-| 5 | **UK RNS news drift** | have it | pilot first | High costs |
+| 1 | **No-news reversals** | have it | none | Cheap to test |
+| 2 | **Run-up before scheduled earnings** | have it | none | Cheap; small edge, liquid stocks only |
+| 3 | **US news drift** (deals, CEO exits, profit warnings) | have it (421,832 filings) | ~$140 | Only if 1–2 find nothing |
+| 4 | **UK RNS news drift** | have it | pilot first | High costs |
 
-1. **Insider buying.** Directors buying their own company's shares with their own money (above all
-   several within a few weeks): buy and hold weeks to months. US: SEC's quarterly *Insider
-   Transactions Data Sets* (Forms 3/4/5 as tables, 2006 on). UK: "Director/PDMR Shareholding"
-   announcements. Open-market purchases (code P) by officers and directors only; cluster = 2+
-   insiders in 30 days; holds of 20 / 60 / 120 days. Risk: the effect is biggest in small
-   companies, the ones most missing from our prices if they later failed.
-2. **No-news reversals.** A stock falls sharply (worse than −2× its normal daily move and the market)
+
+Also: **UK director dealings** (RNS) is untested; the US result lowers its priority.
+1. **No-news reversals.** It also tells us whether the insider model's edge was just dip-buying. A stock falls sharply (worse than −2× its normal daily move and the market)
    on a day with no filing: buy at the close, hold a few days. Risk: news we can't see. Liquid only.
-3. **Run-up before scheduled earnings.** Buy ~5 trading days before the expected results date (from
+2. **Run-up before scheduled earnings.** Buy ~5 trading days before the expected results date (from
    past release dates), sell the day before.
-4. **US news drift.** The earnings pipeline on other 8-Ks; only with a reason to expect a bigger effect.
-5. **UK RNS news drift.** Data complete; costs are the problem. Market-maker file still pending.
+3. **US news drift.** The earnings pipeline on other 8-Ks; only with a reason to expect a bigger effect.
+4. **UK RNS news drift.** Data complete; costs are the problem. Market-maker file still pending.
 
 **Exit ideas** (tools applied per strategy, fixed before each test):
 - **A. Targets scaled to each stock's normal move (default):** target and stop as multiples of the
