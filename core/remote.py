@@ -32,7 +32,7 @@ from core.log import get_logger
 log = get_logger("remote")
 ROOT = "trading-rns/control"
 POLL_S = 5                             # while busy (a job in the last BUSY_FOR)
-IDLE_POLL_S = 15                       # otherwise: keeps B2 list calls near the free daily quota
+IDLE_POLL_S = 10                       # otherwise: keeps B2 list calls near the free daily quota
 BUSY_FOR = timedelta(minutes=10)
 MAX_AGE = timedelta(hours=1)
 MAX_OUT = 200_000                      # characters kept from each of stdout and stderr

@@ -209,7 +209,7 @@ small caps.
    `ssh -o BatchMode=yes -o ConnectTimeout=6 root@178.62.96.171 true`.
 2. **Cloud session** (only HTTPS leaves the container, port 22 is refused): the B2 job queue,
    `uv run python -W ignore -m core.remote run "CMD" [--cwd DIR]`. The droplet's `trading-rns-agent`
-   service (installed by `deploy/setup-agent.sh`) polls B2 every 5s when busy (15s idle), runs each job once (jobs >1h
+   service (installed by `deploy/setup-agent.sh`) polls B2 every 5s when busy (10s idle), runs each job once (jobs >1h
    old are ignored) and stores the output in B2. B2 write access = root on the droplet: guard that key.
 3. **If SSH says "Permission denied (publickey)"** on a local machine, this machine's key isn't on
    the droplet yet. Ask the user to add it once:
