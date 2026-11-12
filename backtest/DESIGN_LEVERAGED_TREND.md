@@ -1,0 +1,40 @@
+# Design: leveraged trend-following on the S&P 500 (written 2026-11-12, BEFORE any result was looked at)
+
+Fixed before running; later changes are added at the end with the reason.
+
+## Why this, now
+The ETF trend test (`DESIGN_ETF_TREND.md`) showed S&P 500 timing (hold it above its 10-month average,
+else cash) had ~2/3 of the index's volatility and under half its worst fall (−22% vs −55%), but earned
+less (9.1% vs 10.8% a year, 2007–2021). Leverage applied only while the trend is up aims to turn that
+lower risk into a higher return than the index (Gayed & Bilello 2016, "Leverage for the Long Run").
+Leveraged S&P 500 UCITS ETFs (2× daily) are available to UK investors.
+
+## Data
+SPY total-return prices from 1993; the 13-week T-bill yield (Yahoo `^IRX`) for cash and financing.
+
+## Modelled leveraged fund (L× daily, rebalanced daily like the real products)
+Daily return = L × SPY's daily return − (L − 1) × (T-bill rate + 0.30%) / 252 − 0.75% / 252.
+(Swap financing on the borrowed part plus a fund fee typical of 2× UCITS products.) Daily resetting
+means losses in choppy markets ("volatility drag") are captured automatically.
+
+## Strategies (fixed)
+- **L1:** 2× fund when SPY's month-end price is above its 10-month average, else cash (monthly).
+- **L2:** 2× fund when SPY's close is above its 200-day average (checked daily, traded at the next
+  day's close), else cash.
+- **L3:** as L1 with 1.5× (between the two).
+- **Benchmarks:** SPY held; the 2× fund held throughout; 1× timing (V4 from the ETF test).
+
+## Costs
+Per switch, each side: 0.10% spread (leveraged ETFs are a little wider) + 0.05% slippage + 0.15%
+currency fee (Trading 212). Cash earns the T-bill rate. No tax (ISA).
+
+## Years and pass rule
+Choose period **1994-01 to 2021-12** (includes 2000–2002, 2008, 2020); final test **2022-01 to the latest
+data, once**, with the chosen strategy frozen. **Pass = a higher total return after costs than SPY
+held over the final period.** Also reported: yearly returns, worst fall from a peak, volatility,
+Sharpe. A worse worst-fall than SPY's is flagged even if the strategy passes.
+
+## Known risks
+A crash that happens faster than the signal can react (1987-style, 2020-style) is twice as painful.
+Choppy, trendless years cause repeated switching losses and leveraged drag. Real leveraged funds
+can differ from the model (financing, tracking); the fee and spread assumptions are estimates.

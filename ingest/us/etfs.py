@@ -12,7 +12,7 @@ import pandas as pd
 
 from ingest.us.common import log, session
 
-ETFS = ["SPY", "QQQ", "IWM", "EFA", "EEM", "VNQ", "GLD", "DBC", "TLT", "IEF", "AGG", "SHY"]
+ETFS = ["SPY", "QQQ", "IWM", "EFA", "EEM", "VNQ", "GLD", "DBC", "TLT", "IEF", "AGG", "SHY", "^IRX"]   # ^IRX: 13-week T-bill yield, %
 
 
 def etfs() -> None:
