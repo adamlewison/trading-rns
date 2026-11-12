@@ -1,6 +1,6 @@
 # trading-rns
 
-Goal: an automated trading system that makes money after costs. Not tied to a market or strategy; whatever wins gets traded. Strategy 1: Claude labels company news released outside market hours, a model scores it, buy at the open with a bracket (+5% / −3% / 3 days). Two candidate markets on equal terms: **US** (SEC 8-Ks, IBKR; low costs, likely the stronger candidate) and **UK** (RNS on AIM/small caps; high costs). README.md has the commands and layout; ASSUMPTIONS.md lists the biases (keep it updated).
+Goal: an automated trading system that makes money after costs. Not tied to a market or strategy; whatever wins gets traded. Strategy 1: Claude labels company news released outside market hours, a model scores it, buy at the open with a bracket (+5% / −3% / 3 days). Two candidate markets on equal terms: **US** (SEC 8-Ks, IBKR; low costs, likely the stronger candidate) and **UK** (RNS on AIM/small caps; high costs). README.md has the commands and layout; ASSUMPTIONS.md lists the biases (keep it updated). **STRATEGIES.md** is the prioritised list of strategies and exit ideas (keep it updated).
 
 ## Status
 - **Phase 1 (data):**
