@@ -84,3 +84,19 @@ Result (liquid, model L, S2, $500): rule e +0.88% per trade net, positive in 201
 (+0.67/+1.26/+0.54); its picks beat the average liquid release by 1.5/2.0/1.05% (average drift
 0.0–0.3%, so not survivorship drift). Model B (no LLM) is negative in 2021. 72 variants have now been
 looked at on these years, so the best one is flattered by selection; only the final test can confirm.
+
+## Addendum 3 (2026-11-12): the user's account, written before running (third look at 2019–2021)
+The user wants $150 per trade, at most 10 days held, $6,000 in total. One setup, fixed here:
+- **Rule (g):** buy at the close of the first trading day after the release, sell at the close 10
+  trading days later. Liquid universe (≥ $20m/day), model L (all LLM inputs + day-1 reaction),
+  walk-forward as before, selection S2 (above last year's top-decile prediction).
+- **Account:** $150 per position, at most 40 open (= $6,000). Days in date order; within a day the
+  highest predictions first; a signal is skipped when 40 are open. Cash not compounded.
+- **Costs, two brokers (same trades):** spread from the liquidity table (≥$500m/day 0.05%,
+  $100–500m 0.10%, $20–100m 0.20% full spread), half each side.
+  - Trading 212: no commission, FX 0.15% each way, slippage 0.15% each side (no closing-auction
+    orders, so a market order just before the close).
+  - IBKR Pro fixed: $0.005/share, min $1, max 1% per side; FX 0.03% each way; slippage 0.10% each side.
+  - Pessimistic check: Corwin–Schultz spread instead of the table.
+- **Reported:** per year, trades taken and skipped, $ profit vs the market and actual, as % of $6,000.
+If it fails here, it is not tuned further on these years.
