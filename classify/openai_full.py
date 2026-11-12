@@ -222,7 +222,14 @@ def run(max_gbp: float = 55.0, client=None, store=None, poll_s: int = POLL_S, on
         for job, j in list(st["jobs"].items()):
             if j["status"] != "sent":
                 continue
-            b = client.batches.retrieve(j["batch_id"])
+            try:
+                b = client.batches.retrieve(j["batch_id"])
+                if b.status in TERMINAL and not (b.status == "failed" and not (b.request_counts and b.request_counts.completed)):
+                    _collect(client, store, st, job, b)
+                    continue
+            except Exception as e:                    # network hiccup etc.: try this job again next pass
+                log.warning("%s: %s: %s; will retry", job, type(e).__name__, str(e)[:200])
+                continue
             if b.status == "failed" and not (b.request_counts and b.request_counts.completed):
                 # rejected as a whole (typically the account's queued-token limit): send it again later,
                 # with fewer batches in flight
@@ -271,7 +278,11 @@ def run(max_gbp: float = 55.0, client=None, store=None, poll_s: int = POLL_S, on
                               st["spent_gbp"], max_gbp, job)
                 capped = True
                 break
-            _send(client, store, st, job)
+            try:
+                _send(client, store, st, job)
+            except Exception as e:
+                log.warning("sending %s failed (%s: %s); will retry", job, type(e).__name__, str(e)[:200])
+                break
             in_flight.append(job)
         queued = [k for k, j in st["jobs"].items() if j["status"] == "queued"]
         log.info("progress: %d jobs collected, %d in flight, %d queued; %d ok; £%.2f spent",

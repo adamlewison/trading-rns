@@ -160,3 +160,18 @@ def test_stalled_batch_is_cancelled_and_rest_resent(tmp_path, monkeypatch):
     assert "chunk-0000-p0-retry1" in st["jobs"] and len(st["jobs"]["chunk-0000-p0-retry1"]["ids"]) == 1
     sent = [r["custom_id"] for b in client.batches_.values() for r in b.reqs]
     assert len(sent) == 5 and len(set(sent)) == 4    # only the unfinished one was sent again
+
+
+def test_network_error_on_one_batch_is_retried_not_fatal(tmp_path):
+    """2026-11-12: the droplet runner died twice mid-collection. One failing call must not stop the run."""
+    store, client = _setup(tmp_path), FakeOpenAI()
+    real, calls = client.batches.retrieve, {"n": 0}
+
+    def flaky(bid):
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise ConnectionError("reset by peer")
+        return real(bid)
+    client.batches.retrieve = flaky
+    st = of.run(max_gbp=1.0, client=client, store=store, poll_s=0)
+    assert st["succeeded"] == 6 and st["finished"] and len(client.batches_) == 3
