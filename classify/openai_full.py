@@ -258,7 +258,10 @@ def run(max_gbp: float = 55.0, client=None, store=None, poll_s: int = POLL_S, on
                 straggling = done >= STRAGGLER_DONE and age > timedelta(hours=STRAGGLER_H)
                 stalled = b.status == "in_progress" and still > timedelta(hours=STALL_H) and age > timedelta(hours=STALL_H)
                 if (straggling or stalled) and not j.get("cancel_asked"):
-                    client.batches.cancel(j["batch_id"])
+                    try:
+                        client.batches.cancel(j["batch_id"])
+                    except Exception as e:            # e.g. 409 "Cannot cancel a batch with status 'finalizing'"
+                        log.warning("%s: cancel refused (%s); leaving it to finish", job, str(e)[:200])
                     j["cancel_asked"] = True
                     changed = True
                     log.info("%s: %d/%d done, no progress for %.1fh; cancelling and re-sending the rest",

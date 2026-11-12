@@ -175,3 +175,17 @@ def test_network_error_on_one_batch_is_retried_not_fatal(tmp_path):
     client.batches.retrieve = flaky
     st = of.run(max_gbp=1.0, client=client, store=store, poll_s=0)
     assert st["succeeded"] == 6 and st["finished"] and len(client.batches_) == 3
+
+
+def test_cancel_refused_while_finalizing_is_not_fatal(tmp_path, monkeypatch):
+    """2026-11-12 crash: 409 'Cannot cancel a batch with status finalizing'."""
+    store, client = _setup(tmp_path, chunks=1, size=4), FakeOpenAI()
+    monkeypatch.setattr(of, "estimate", lambda store=None: {"chunks": 1, "chunk_size": 4, "gbp_per_release": 0.001, "gbp_est": 0.004})
+    monkeypatch.setattr(of, "JOB_SIZE", 4)
+    monkeypatch.setattr(of, "STALL_H", -1.0)
+
+    def refuse(bid):
+        raise RuntimeError("409 Cannot cancel a batch with status 'finalizing'")
+    client.batches.cancel = refuse
+    st = of.run(max_gbp=1.0, client=client, store=store, poll_s=0)
+    assert st["succeeded"] == 4 and st["finished"]
