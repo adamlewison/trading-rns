@@ -35,7 +35,7 @@ uk:
     issuer_historic_index: https://docs.londonstockexchange.com/reports/issuers/historic.json
     issuer_archive_min_year: 2011   # monthly snapshots used for point-in-time market & market cap
     include_aim: true
-    include_smallcap_proxy: true    # Main Market commercial equities outside the FTSE 350 (see ASSUMPTIONS.md)
+    include_smallcap_proxy: true    # Main Market commercial equities outside the FTSE 350 (see CLAUDE.md)
     # LSE "Market Sector Code" values that mark FTSE 100 / FTSE 250 members in the instrument list
     ftse100_sector_codes: [FE10, FS10]
     ftse250_sector_codes: [F25T, F25F, F25S]
@@ -55,7 +55,7 @@ uk:
   announcements:
     source: investegate
     min_interval_s: 0.5             # 2 req/s (user decision 2026-11-07; robots.txt sets no crawl-delay)
-    index_mode: company             # company | daily  (see README)
+    index_mode: company             # company | daily  (see CLAUDE.md)
     # only fetch full body text for announcements that are (a) non-admin and (b) for universe tickers
     bodies_only_for_universe: true
     bodies_only_pre_open: true      # hypothesis is about pre-open news (user decision 2026-11-07)

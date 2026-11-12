@@ -11,7 +11,7 @@ Point in time, conservatively:
 - financials use only facts FILED before the trade date, and for each period the FIRST filed value
   (later restatements ignored).
 
-Outcomes (pre-registered in PLAN.md), each also net of the market over the same days (SPY and IWM):
+Outcomes (pre-registered; see CLAUDE.md), each also net of the market over the same days (SPY and IWM):
   r_a  open -> close of the trade day
   r_b  bracket +5% / -3% / 3 days (if a day's range touches both, the stop is assumed hit first; an
        opening gap through a level fills at the open)

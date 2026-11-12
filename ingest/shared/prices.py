@@ -14,7 +14,7 @@ def flag_prices(df: pd.DataFrame, glitch_ratio: float = 30.0) -> pd.DataFrame:
 
     NOTE: close (and open) outside [low, high] is NOT flagged. For LSE small caps Yahoo's
     open/close are usually official auction/mid prices while high/low are trade prices,
-    so this happens routinely and is not a data error (see ASSUMPTIONS.md).
+    so this happens routinely and is not a data error (see CLAUDE.md).
     """
     df = df.sort_values("date").copy()
     o, h, l, c, v = (df[k] for k in ("open", "high", "low", "close", "volume"))

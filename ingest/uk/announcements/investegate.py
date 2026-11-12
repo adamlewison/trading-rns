@@ -2,7 +2,7 @@
 
 robots.txt (checked 2026-11-07) allows /company/, /today-announcements/ and /announcement/.
 Terms of use: personal reference by private investors only; no redistribution or commercial use.
-=> Use for personal research only, never republish the text, rate-limit politely (see README).
+=> Use for personal research only, never republish the text, rate-limit politely (see CLAUDE.md).
 
 Timestamps on listing pages are UK wall-clock time ("01 Oct 2026" + "07:00 AM").
 The announcement page itself carries no machine-readable timestamp, so the listing time is
