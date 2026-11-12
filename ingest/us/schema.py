@@ -56,6 +56,9 @@ CREATE TABLE IF NOT EXISTS us_insider_tx (       -- Form 4 non-derivative transa
     trans_code VARCHAR, acq_disp VARCHAR, shares DOUBLE, price DOUBLE, shares_after DOUBLE,
     direct_indirect VARCHAR
 );
+CREATE TABLE IF NOT EXISTS us_etf_daily (          -- whole-history ETF prices (ETF trend test)
+    ticker VARCHAR, date DATE, open DOUBLE, high DOUBLE, low DOUBLE, close DOUBLE, adj_close DOUBLE, volume DOUBLE
+);
 CREATE TABLE IF NOT EXISTS us_progress (
     key VARCHAR PRIMARY KEY, status VARCHAR, n INTEGER, updated_at TIMESTAMP
 );
