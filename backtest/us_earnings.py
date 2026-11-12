@@ -141,7 +141,7 @@ def add_close_entry(d: pd.DataFrame, big: pd.Series) -> pd.DataFrame:
     with session(read_only=True, memory_limit="6GB") as con:
         P = Prices(con, sorted(set(d.ticker.dropna())) + ["SPY", "IWM"])
     o, c = P.cols["open"], P.cols["close"]
-    res = {k: np.full(len(d), np.nan) for k in ["r_e", "r_f", "spy_e", "spy_f", "iwm_e", "iwm_f", "spy_1", "iwm_1"]}
+    res = {f"{p}_{r}": np.full(len(d), np.nan) for p in ("r", "spy", "iwm") for r in list(HOLD_CLOSE) + ["1"]}
     bench = {}
     for sym in ("SPY", "IWM"):
         s0, e0 = P.span[sym]

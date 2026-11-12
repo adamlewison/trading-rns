@@ -100,3 +100,6 @@ The user wants $150 per trade, at most 10 days held, $6,000 in total. One setup,
   - Pessimistic check: Corwin–Schultz spread instead of the table.
 - **Reported:** per year, trades taken and skipped, $ profit vs the market and actual, as % of $6,000.
 If it fails here, it is not tuned further on these years.
+**Result (2026-11-12): fails.** Picks vs market before costs +0.61% / +1.03% / −0.48% per trade
+(2019/2020/2021). Trading 212: −$64 / +$189 / −$576 vs the market on $6,000; IBKR fixed: −$440 /
+−$538 / −$1,038. Not tuned further on these years, as written above.
