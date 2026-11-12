@@ -189,15 +189,28 @@ small caps.
   is **not** admin. Replacements and non-regulatory items kept and flagged.
 - SETS/SETSqx from LSE's official files, current only (today's service is a proxy for the past).
 
-## 9. Where things run, layout, commands
+## 9. Infrastructure, layout, commands
 
-**Droplet** `trading-rns` (DigitalOcean, 178.62.96.171, 1 vCPU / 1GB / 25GB, 2GB swap). The user
-connects with Termius; cloud sessions can't SSH, so give the user commands to run.
+| Piece | What it is | Notes |
+|---|---|---|
+| **GitHub** | `adamlewison/trading-rns`, branch `claude/uk-smallcap-rns-drift-i83n19` | code and this doc; never data or secrets |
+| **DigitalOcean droplet** `trading-rns` | 178.62.96.171, 1 vCPU / 1GB RAM / 25GB disk + 2GB swap, ~$6/month | the only machine that scrapes and pushes backups; the user connects with **Termius** (agents can't SSH: give the user commands) |
+| **Backblaze B2** bucket `trading-rns-backup-c0772b` (private) | backups of everything: UK `trading-rns/v1/`, US `trading-rns/us/v1/`, LLM runs and results `trading-rns/llm/v1/` | keys `B2_KEY_ID` / `B2_APP_KEY` in `.env`; also how cloud sessions get the data (`core.backup pull`) |
+| **Cloud sessions** (Claude Code on the web) | where agents work; fresh container each time, 4 CPU / 16GB | data must be pulled from B2 first; API keys for api.openai.com and ai-gateway.vercel.sh are injected by the session's network proxy (no key in code) |
+| **OpenAI API** | GPT-6 Luna via the Batch API (half price) | prepaid credit topped up by the user; key on the droplet in `/opt/trading-rns-us/.env` (`OPENAI_API_KEY`) |
+| **Anthropic API** | Haiku runner (`classify/us_earnings_full.py`), fallback only | key only on the droplet's `.env`, never in cloud sessions |
+| **Vercel AI Gateway** | used for model comparisons | free tier blocks some models and OpenAI-format batches |
+| **Scheduled check-in** | a Claude scheduled task that checks the droplet and LLM runs every ~5 hours | re-arms itself; stop it when nothing is running |
+
+**Droplet details**
 - UK checkout `/opt/trading-rns` (services `trading-rns-scrape`, `trading-rns-backup`); US checkout
-  `/opt/trading-rns-us` (services `trading-rns-us`, `trading-rns-us-backup`; API keys in its `.env`).
-  Setup: `bash deploy/setup-uk.sh` / `bash deploy/setup-us.sh`. Logs in `data/logs/`.
+  `/opt/trading-rns-us` (services `trading-rns-us`, `trading-rns-us-backup`, plus one-off units such
+  as `luna-run`, `us-splits`). Setup: `bash deploy/setup-uk.sh` / `bash deploy/setup-us.sh`. Logs in
+  `data/logs/`. Run long one-off jobs with `systemd-run --unit=NAME -p Restart=on-failure ...`.
+- Each backup loop pushes every 30 minutes and uploads a status file; read it from anywhere with
+  `core.backup status --remote --profile uk|us`.
 - **One writer per market:** only the droplet scrapes or pushes backups. Never run a scrape or
-  `core.backup push` elsewhere while it runs.
+  `core.backup push` elsewhere while it runs (two writers corrupt the backup).
 - DuckDB repair after a failed checkpoint: `core.dbcheck --profile us --checkpoint`.
 
 **Layout**
