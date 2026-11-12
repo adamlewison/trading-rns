@@ -63,3 +63,11 @@ the opening gap (open vs previous close), the open-to-close return, and that ret
 benchmark's. Training rows must have ended before the predicted year (trade before 1 Oct of the
 previous year for 60-day holds). A window with a stale or suspect price, or that runs past the
 data, gives no outcome. No stop-loss (the drift literature holds through).
+
+## Addendum 2 (2026-11-12, after the choose-years results were seen; reported as a change)
+**Why:** in the first run every short-hold rule lost because the picks cost ~1.3–2.1% to trade (wide
+spreads on small stocks), while the LLM labels did improve the ranking. One follow-up, agreed with
+the user: the **liquid universe**. Only releases whose stock traded ≥ $20m a day on average over the
+previous 20 days, for training AND trading. Everything else unchanged (models, rules a–f,
+selections, costs, years). Output stage `choose_liquid`. This is the second look at 2019–2021; both
+runs are reported. If nothing passes, no more variants are tried on these years without a new reason.

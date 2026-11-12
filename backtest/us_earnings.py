@@ -29,6 +29,7 @@ REACT = ["gap", "day1_ret", "day1_x"]       # known at the day-1 close: only for
 SIZES = [30, 100, 200, 500]
 SPREAD_X = [1.0, 1.5, 2.0]
 MIN_PRICE, MIN_DOLLAR_VOL = 1.0, 500_000
+UNIVERSES = {"all": MIN_DOLLAR_VOL, "liquid": 20_000_000}     # design addendum 2
 BIG_CAP = 10e9
 SPREAD_FALLBACK = 0.01          # 1% when no estimate (fewer than 5 prior days)
 CLIP_Y = 0.5
@@ -98,13 +99,13 @@ def add_spreads(df: pd.DataFrame) -> pd.Series:
 
 
 # ---------------------------------------------------------------- data
-def load(final: bool = False) -> pd.DataFrame:
+def load(final: bool = False, min_dvol: float = MIN_DOLLAR_VOL) -> pd.DataFrame:
     d = pd.read_parquet(FEAT)
     d["trade_date"] = pd.to_datetime(d.trade_date)
     if not final:
         d = d[d.trade_date < TEST_START]                 # the test years stay unseen
     d = d[d.skip.isna() & ~d.fwd_bad.fillna(True).astype(bool) & d.prev_close.notna()]
-    d = d[(d.prev_close >= MIN_PRICE) & (d.dollar_vol_20d >= MIN_DOLLAR_VOL)].copy()
+    d = d[(d.prev_close >= MIN_PRICE) & (d.dollar_vol_20d >= min_dvol)].copy()
     d["year"] = d.trade_date.dt.year
     d["log_dvol"] = np.log(d.dollar_vol_20d)
     d["after_close"] = (d.session == "after_close").astype(int)
@@ -230,11 +231,12 @@ def pooled(s: pd.DataFrame) -> pd.DataFrame:
     return g.drop(columns=["gross_sum", "net_sum", "hit_sum"]).reset_index()
 
 
-def run(stage: str, final: bool = False) -> str:
+def run(stage: str, final: bool = False, universe: str = "all") -> str:
     if stage == "final" and not final:
         raise SystemExit("the test years are run once, after the user's OK: add --final")
     years = CHOOSE if stage == "choose" else [2022, 2023, 2024, 2025, 2026]
-    d = load(final=(stage == "final"))
+    d = load(final=(stage == "final"), min_dvol=UNIVERSES[universe])
+    stage = stage if universe == "all" else f"{stage}_{universe}"
     log.info("tradable rows: %d (%s)", len(d), d.year.value_counts().sort_index().to_dict())
     summ, trades = evaluate(d, years)
     OUT.mkdir(parents=True, exist_ok=True)
@@ -276,8 +278,9 @@ def main() -> None:
     ap.add_argument("stage", choices=["choose", "final", "report"])
     ap.add_argument("--final", action="store_true", help="allow the one-time run on 2022–2026")
     ap.add_argument("--of", default="choose", help="report: which stage")
+    ap.add_argument("--universe", choices=list(UNIVERSES), default="all")
     a = ap.parse_args()
-    print(report(a.of) if a.stage == "report" else run(a.stage, a.final))
+    print(report(a.of) if a.stage == "report" else run(a.stage, a.final, a.universe))
 
 
 if __name__ == "__main__":
