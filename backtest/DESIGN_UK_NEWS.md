@@ -81,3 +81,11 @@ The "ahead of expectations" rule: −£377 (only 2019 positive). Every 1/3/5-day
 every year. The margin is razor-thin (≈1.3% a year on the account) and 75 UK variants have now been
 looked at, so the result is flattered by selection; survivorship (27% of news from delisted companies
 without prices) flatters it further. Next: the user decides whether to freeze S1L + H20 for the final test.
+
+## FROZEN for the final test (2026-11-13, user agreed)
+**S1L + H20:** LightGBM (fixed settings) on the baseline + label features, walk-forward, buy above the
+previous year's top-quintile prediction, enter at the 08:00 open, sell at the close of day 20; £120 per
+position, 40 slots, UK cost table, stamp duty on Main Market buys. Run ONCE on 2022 → latest with
+`backtest.uk_news final --final --labels`. Verdict: the account's actual £ result vs holding the FTSE
+All-Share with the same £4,800 (index price return + 3.5%/yr for dividends, which the price index omits),
+summed over the period; also reported vs the AIM/SmallCap benchmark per trade. Not changed afterwards.
