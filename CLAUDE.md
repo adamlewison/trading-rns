@@ -43,9 +43,10 @@ then paper trading, then small size.
   the pre-earnings run-up and ETF trend-following (choose period; final years unused).
 - **Leveraged trend-following** passed 1994–2021 but **failed its final test** (2022 → now: +7% vs SPY +69%).
 - **UK news drift (no LLM)** failed on 2019–2021: costs ~2.5–2.8% a round trip beat every category.
-- **Now:** UK LLM pilot `uk-rns-pilot-v1-20261112T221859` (500 announcements, ~7p) queued at OpenAI since
-  2026-11-12 22:19, collected on the droplet (`uk-llm` unit). User approved the full UK run (~£15–40, cap
-  £55) if the pilot is positive (≥95% parsed, sensible labels, cost OK). Then re-test UK drift with labels.
+- **Now:** UK labelling with Luna. Pilot passed 2026-11-13 (500/500 parsed, 11% state results vs market
+  expectations, £0.12; the batch queue sat idle 8h so it ran direct at 2× price). Full run
+  `uk-rns-full-v1-20261113T064938` (55,654 announcements, ~£14, cap £55) running direct on the droplet
+  (`uk-llm-full`, `classify.uk_news run NAME --sync`), done ~13:00 UTC. Then: user OK for the labelled UK test.
 - **The user's account:** about $6,000, around $150 per trade, Trading 212, holds up to ~20 days.
 - Droplet runner (`trading-rns-agent`) installed 2026-11-12: agents reach the droplet themselves (~6s a command).
 - If the last ~419 Luna labels arrive (155 small batches still at OpenAI, `luna-run` service waiting): `classify.labels build`, then `features.us_earnings_labels build`.
@@ -92,6 +93,8 @@ then paper trading, then small size.
 7. **In liquid US stocks the simple published effects are gone after costs:** post-earnings drift after
    the next open (2022–2026), short-term reversal after no-news falls and the pre-earnings run-up
    (2019–2021, both ≈0% before costs). Prefer strategies that trade rarely.
+12. **OpenAI's batch queue can sit idle for hours** (UK pilot: 0/500 after 8.5h). For runs under ~£20 the
+    direct API (2× price, `--sync`) finishes in hours; keep batches for big runs.
 11. **Trend-following lowers risk but lags buy-and-hold in bull markets** (2007–2021: 9.1% vs 10.8%/yr).
     Adding leverage made it beat the index over 1994–2021 (two slow crashes it dodged) and lose badly in
     2022–26 (a choppy bear it didn't): its result rests on a handful of crash episodes, so it's fragile.
@@ -129,7 +132,7 @@ or with delisted prices. Open lead: the insider model's small-stock picks (worth
 | # | Strategy | Data | LLM cost | Why here |
 |---|---|---|---|---|
 | 1 | **US news drift** (deals, CEO exits, profit warnings) | have it (421,832 filings) | ~$140 | Only with a reason to expect a bigger effect than earnings |
-| 2 | **UK news drift with LLM labels** | have it | pilot ~£1, full ~£40 | No-LLM model got within 0.3% of costs at 20 days; labels lifted US ranking ~50%. Survivorship flatters |
+| 2 | **UK news drift with LLM labels** | labelling now | ~£14 | No-LLM model got within 0.3% of costs at 20 days; labels lifted US ranking ~50%. Survivorship flatters |
 
 
 Also: **UK director dealings** (RNS) is untested; the US result lowers its priority.
