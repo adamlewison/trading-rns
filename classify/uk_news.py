@@ -167,6 +167,66 @@ def _use(name: str) -> None:
     of.estimate = lambda store=None, _e=meta["estimate"]: _e
 
 
+SYNC_PRICE = tuple(2 * x for x in of.PRICE)          # direct (non-batch) API price: twice the batch price
+
+
+def run_sync(name: str, max_gbp: float, workers: int = 12, limit: int | None = None) -> dict:
+    """Send the run's requests directly (no batch queue), in parallel. Results are stored where the
+    batch runner keeps them (results/sync-<chunk>.jsonl.gz), so `report` works the same. Resumable:
+    requests already answered are skipped. Stops before the cap would be passed."""
+    from concurrent.futures import ThreadPoolExecutor
+    _use(name)
+    store, client = of._store(), of._client()
+    meta = json.loads(store.get(f"{B2_ROOT}/{name}/run.json"))
+    st = of._load(store)
+    st.setdefault("sync", True)
+    done = set()
+    for key in store.list(f"{of._prefix()}/results/"):
+        for l in gzip.decompress(store.get(key)).decode().splitlines():    # only answered ones; errors are retried
+            if l.strip() and json.loads(l)["result"]["type"] == "succeeded":
+                done.add(json.loads(l)["custom_id"])
+    est_sync = meta["estimate"]["gbp_est"] * 2
+    if st["spent_gbp"] + est_sync * (1 - len(done) / max(meta["n"], 1)) > max_gbp:
+        raise SystemExit(f"direct-run estimate £{est_sync:.2f} would pass the cap £{max_gbp:.2f}")
+
+    def one(line: str) -> dict:
+        x = json.loads(of.to_openai(line))
+        for attempt in range(4):
+            try:
+                r = client.chat.completions.create(**x["body"])
+                body = json.loads(r.to_json())
+                return {"custom_id": x["custom_id"], "response": {"status_code": 200, "body": body}}
+            except Exception as e:
+                err = str(e)[:300]
+                import time as _t; _t.sleep(2 ** attempt)
+        return {"custom_id": x["custom_id"], "error": {"message": err}}
+
+    for k in range(meta["chunks"]):
+        chunk = f"chunk-{k:04d}"
+        todo = [l for l in of._lines(store, chunk) if json.loads(l)["custom_id"] not in done][:limit]
+        if not todo:
+            continue
+        with ThreadPoolExecutor(workers) as ex:
+            raw = list(ex.map(one, todo))
+        res = [of.to_result(x) for x in raw]
+        ok = [r for r in res if r["result"]["type"] == "succeeded"]
+        u = [r["result"]["message"]["usage"] for r in ok]
+        inp, cac, out = (sum(x[k_] for x in u) for k_ in ("input_tokens", "cache_read_input_tokens", "output_tokens"))
+        cost = (inp * SYNC_PRICE[0] + cac * SYNC_PRICE[1] + out * SYNC_PRICE[2]) / 1e6 * ue.llm_cfg()["usd_gbp"]
+        old = store.get(f"{of._prefix()}/results/sync-{chunk}.jsonl.gz")
+        prev = gzip.decompress(old).decode().splitlines() if old else []
+        store.put(f"{of._prefix()}/results/sync-{chunk}.jsonl.gz",
+                  gzip.compress("\n".join(prev + [json.dumps(r) for r in res]).encode()))
+        st["spent_gbp"] = round(st["spent_gbp"] + cost, 4)
+        st["succeeded"] += len(ok); st["errored"] += len(res) - len(ok)
+        st["input"] += inp; st["cached"] += cac; st["output"] += out
+        of._save(store, st)
+        log.info("sync %s: %d ok, %d failed, £%.3f (total £%.2f)", chunk, len(ok), len(res) - len(ok), cost, st["spent_gbp"])
+        if st["spent_gbp"] > max_gbp:
+            raise SystemExit("cap reached")
+    return st
+
+
 def report(name: str) -> str:
     from classify.labels import parse
     _use(name)
@@ -199,14 +259,18 @@ def main() -> None:
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("prepare"); p.add_argument("scope", choices=["pilot", "full"])
     r = sub.add_parser("run"); r.add_argument("name"); r.add_argument("--max-gbp", type=float, default=55.0)
+    r.add_argument("--sync", action="store_true", help="direct API calls instead of the batch queue (2x price)")
     s = sub.add_parser("status"); s.add_argument("name")
     q = sub.add_parser("report"); q.add_argument("name")
     a = ap.parse_args()
     if a.cmd == "prepare":
         prepare(a.scope)
     elif a.cmd == "run":
-        _use(a.name)
-        of.run(max_gbp=a.max_gbp)
+        if a.sync:
+            run_sync(a.name, a.max_gbp)
+        else:
+            _use(a.name)
+            of.run(max_gbp=a.max_gbp)
     elif a.cmd == "status":
         _use(a.name)
         print(of.status())
