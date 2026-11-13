@@ -43,7 +43,9 @@ then paper trading, then small size.
   the pre-earnings run-up and ETF trend-following (choose period; final years unused).
 - **Leveraged trend-following** passed 1994–2021 but **failed its final test** (2022 → now: +7% vs SPY +69%).
 - **UK news drift (no LLM)** failed on 2019–2021: costs ~2.5–2.8% a round trip beat every category.
-- **Next:** user to choose (section 7).
+- **Now:** UK LLM pilot `uk-rns-pilot-v1-20261112T221859` (500 announcements, ~7p) queued at OpenAI since
+  2026-11-12 22:19, collected on the droplet (`uk-llm` unit). User approved the full UK run (~£15–40, cap
+  £55) if the pilot is positive (≥95% parsed, sensible labels, cost OK). Then re-test UK drift with labels.
 - **The user's account:** about $6,000, around $150 per trade, Trading 212, holds up to ~20 days.
 - Droplet runner (`trading-rns-agent`) installed 2026-11-12: agents reach the droplet themselves (~6s a command).
 - If the last ~419 Luna labels arrive (155 small batches still at OpenAI, `luna-run` service waiting): `classify.labels build`, then `features.us_earnings_labels build`.
