@@ -18,7 +18,7 @@ from ingest.us.parse import (
 
 
 # ---------------------------------------------------------------- 6. prices
-def prices(limit: int | None = None, refresh: bool = False) -> None:
+def prices(limit: int | None = None, refresh: bool = False, only: list[str] | None = None) -> None:
     import yfinance as yf
 
     c = us_cfg()
@@ -30,6 +30,8 @@ def prices(limit: int | None = None, refresh: bool = False) -> None:
             "SELECT DISTINCT ticker FROM us_price_download_log WHERE attempted_at > ?",
             [datetime.now() - timedelta(days=3)]).fetchall()}
     todo = [t for t in list(c["benchmarks"]) + sorted(tk) if t not in recent]
+    if only is not None:                        # paper trading: just these (full history, so adj_close stays consistent)
+        todo = list(dict.fromkeys(list(c["benchmarks"]) + list(only)))
     if limit:
         todo = todo[:limit]
     log.info("prices: %d tickers", len(todo))

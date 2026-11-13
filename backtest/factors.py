@@ -24,9 +24,9 @@ CHOOSE = (pd.Timestamp("2013-01-01"), pd.Timestamp("2021-12-31"))
 VARIANTS = ["V", "Q", "M", "QVM"]
 
 
-def month_end_panel(con) -> pd.DataFrame:
+def month_end_panel(con, since: str | None = None) -> pd.DataFrame:
     """Every liquid stock at every month-end: price, 20-day dollar volume, 12-1 month momentum, its CIK."""
-    df = con.execute("""
+    df = con.execute(f"""
         WITH p AS (
             SELECT ticker, date, close, adj_close, volume,
                    avg(close * volume) OVER w20 AS dvol20,
@@ -34,6 +34,7 @@ def month_end_panel(con) -> pd.DataFrame:
                    date_trunc('month', date) AS m,
                    row_number() OVER (PARTITION BY ticker, date_trunc('month', date) ORDER BY date DESC) AS last_in_month
             FROM us_prices_daily WHERE NOT is_stale AND NOT is_suspect AND ticker NOT IN ('SPY','IWM')
+              {"" if since is None else f"AND date >= DATE '{since}'"}
             WINDOW w AS (PARTITION BY ticker ORDER BY date),
                    w20 AS (PARTITION BY ticker ORDER BY date ROWS BETWEEN 19 PRECEDING AND CURRENT ROW))
         SELECT p.ticker, p.date, p.close, p.adj_close, p.dvol20, adj_1m / adj_12m - 1 AS mom_12_1, t.cik
@@ -52,9 +53,11 @@ def rank(s: pd.Series, by: pd.Series) -> pd.Series:
     return s.groupby(by).rank(pct=True).fillna(0.5)
 
 
-def build_scores() -> pd.DataFrame:
-    with session(read_only=True, memory_limit="10GB") as con:
-        pan = month_end_panel(con)
+def build_scores(since: str | None = None, memory: str = "10GB", only_last: bool = False) -> pd.DataFrame:
+    with session(read_only=True, memory_limit=memory) as con:
+        pan = month_end_panel(con, since)
+        if only_last:
+            pan = pan[pan.date == pan.date.max()]
         log.info("month-end panel: %d rows", len(pan))
         pan["key"] = pan.ticker + "|" + pan.date.dt.strftime("%Y%m%d")
         v = pan.rename(columns={"key": "accession", "close": "prev_close"}) \

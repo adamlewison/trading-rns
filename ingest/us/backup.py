@@ -20,7 +20,7 @@ def profile():
         name="us", prefix=c["backup_prefix"], db=c["db"], schema=SCHEMA, raw_dir=c["raw_dir"] / "sec",
         snapshot_tables=["sec_form_index", "sec_companies", "sec_filings", "sec_ticker_map", "us_facts",
                          "us_prices_daily", "us_price_download_log", "us_progress",
-                         "us_splits", "us_split_log", "us_insider_tx", "us_etf_daily"],
+                         "us_splits", "us_split_log", "us_insider_tx", "us_etf_daily", "paper_picks", "paper_marks"],
         incr_table="us_filing_docs", incr_key="accession",
         manifest=c["db"].parent / "backup_manifest_us.json", status_name="us_status.json",
         status_fn=status, can_prune_raw=True, bulk_dir=c["raw_dir"] / "bulk")

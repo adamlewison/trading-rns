@@ -59,6 +59,13 @@ CREATE TABLE IF NOT EXISTS us_insider_tx (       -- Form 4 non-derivative transa
 CREATE TABLE IF NOT EXISTS us_etf_daily (          -- whole-history ETF prices (ETF trend test)
     ticker VARCHAR, date DATE, open DOUBLE, high DOUBLE, low DOUBLE, close DOUBLE, adj_close DOUBLE, volume DOUBLE
 );
+CREATE TABLE IF NOT EXISTS paper_picks (           -- paper trading: what the frozen rules picked
+    variant VARCHAR, scored_on DATE, entry_date DATE, rank INTEGER, ticker VARCHAR, score DOUBLE,
+    entry_adj DOUBLE, dvol20 DOUBLE, recorded_at TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS paper_marks (           -- paper trading: each month's result vs SPY
+    variant VARCHAR, entry DATE, until DATE, ret DOUBLE, spy DOUBLE, open BOOLEAN, updated_at TIMESTAMP
+);
 CREATE TABLE IF NOT EXISTS us_progress (
     key VARCHAR PRIMARY KEY, status VARCHAR, n INTEGER, updated_at TIMESTAMP
 );
