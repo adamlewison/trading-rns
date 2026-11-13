@@ -51,7 +51,10 @@ then paper trading, then small size.
 - **UK director buying** passed 2019–2021 (+£780) but **failed its final test** (2022 → now: −£1,888 vs a FTSE fund).
 - **Large-company factor portfolio** failed: quality (run to the final test by user override) made +42% vs
   SPY +64% in 2022 → now; the variants that lagged in 2013–21 beat SPY in 2022 → now. No consistent edge.
-- **Next:** user to choose (section 7).
+- **Paper trading (live, nothing traded) started 2026-11-13** at the user's request: the four factor portfolios
+  (V, Q, M, QVM; frozen rules in `backtest/DESIGN_FACTORS.md`), droplet timer `trading-rns-paper` weekdays
+  22:30 UTC, first rebalance **2026-12-01**. Results: `uv run python -W ignore -m paper.factors status`, or
+  B2 `trading-rns/paper/status.md`. Judge after ≥ 12 months; no picking a winner early.
 - **The user's account:** about $6,000, around $150 per trade, Trading 212, holds up to ~20 days.
 - Droplet runner (`trading-rns-agent`) installed 2026-11-12: agents reach the droplet themselves (~6s a command).
 - US Luna leftovers: 150,457 of 150,518 labelled; 13 small batches still at OpenAI (`luna-run` on the droplet). When done: `classify.labels build`, then `features.us_earnings_labels build`.
@@ -226,6 +229,7 @@ small caps.
 | **Vercel AI Gateway** | used for model comparisons | free tier blocks some models and OpenAI-format batches |
 | **Droplet control** | `deploy/on-droplet.sh "CMD" [DIR]` picks the route: SSH if this machine can, else the B2 job queue | see *Reaching the droplet* below |
 | **Keys** | `.env.example` lists every key and where it lives | cloud sessions: environment network secrets (B2, OpenAI, Vercel) injected by the proxy; droplet: `.env` files |
+| **Paper trading** | `paper/factors.py`, droplet timer `trading-rns-paper` (weekdays 22:30 UTC; acts on the first trading day of each month) | tables `paper_picks`, `paper_marks` (backed up); summary in B2 `trading-rns/paper/status.md`; setup `deploy/setup-paper.sh` |
 | **Scheduled check-in** | a Claude scheduled task that checks the droplet and LLM runs every ~5 hours | re-arms itself; stop it when nothing is running |
 
 **Reaching the droplet** (it depends where the agent runs; `deploy/on-droplet.sh` tries 1 then 2)
