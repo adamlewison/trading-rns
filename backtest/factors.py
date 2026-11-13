@@ -38,7 +38,10 @@ def month_end_panel(con) -> pd.DataFrame:
                    w20 AS (PARTITION BY ticker ORDER BY date ROWS BETWEEN 19 PRECEDING AND CURRENT ROW))
         SELECT p.ticker, p.date, p.close, p.adj_close, p.dvol20, adj_1m / adj_12m - 1 AS mom_12_1, t.cik
         FROM p JOIN (SELECT DISTINCT ticker, cik FROM sec_ticker_map) t USING (ticker)
-        WHERE last_in_month = 1 AND p.close >= 5 AND p.dvol20 >= 20e6""").df()
+        WHERE last_in_month = 1 AND p.close >= 5 AND p.dvol20 >= 20e6
+          -- only the market's real month-end trading day (a stock that didn't trade then is skipped that month)
+          AND p.date IN (SELECT max(date) FROM us_prices_daily WHERE ticker = 'SPY' AND NOT is_stale
+                         GROUP BY date_trunc('month', date))""").df()
     df["date"] = pd.to_datetime(df.date)
     # one share class per company: the most traded
     return df.sort_values("dvol20", ascending=False).drop_duplicates(["cik", "date"]).reset_index(drop=True)

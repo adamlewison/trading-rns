@@ -41,3 +41,10 @@ also beat SPY over 2013–2019). **Final pass:** beats SPY in total over 2022 �
 For each year, the companies whose latest 10-K reported a public float (`EntityPublicFloat`) ≥ $5bn,
 and how many of them have no price in our data at that date: the share of the large-company world we
 cannot see. Reported beside the results.
+
+## Change 1 (2026-11-13): bug fix after the first run
+The first run used each stock's own last trading day of the month as its "month-end", creating 311
+rebalance dates in 179 months; on the odd dates the universe was a handful of stocks and the top 30
+included junk (e.g. a $15,538 reverse-split penny stock), giving impossible returns (2020: +99% to +178%)
+and wrong SPY years. Fixed: only the market's real month-end trading day (SPY calendar) counts. No rule
+was changed; the first run's numbers are void.
