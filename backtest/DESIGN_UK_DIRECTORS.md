@@ -44,3 +44,9 @@ the FTSE All-Share with dividends, after costs: **S1 (≥ £20k) + H60 +£780** 
 both trailing-stop variants negative. Three variants meet the pass rule. Caveats: few events (209 for
 S1 + H60 over three years), 2020's rebound contributes most, survivorship (failed small companies have no
 prices), and only pre-open announcements were labelled. Next: the user chooses one to freeze.
+
+## FROZEN for the final test (2026-11-13, user agreed)
+**S1 + H60:** director/PDMR purchases totalling ≥ £20,000 announced before 08:00, bought at that day's
+open, sold at the close of day 60; £120 per position, 40 slots, UK cost table and stamp duty. Run ONCE on
+2022 → latest with `backtest.uk_directors final --final`. Pass = beats the FTSE All-Share (with dividends)
+after costs in total over the period. The other 5 variants are printed for information only.
