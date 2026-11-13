@@ -48,3 +48,5 @@ rebalance dates in 179 months; on the odd dates the universe was a handful of st
 included junk (e.g. a $15,538 reverse-split penny stock), giving impossible returns (2020: +99% to +178%)
 and wrong SPY years. Fixed: only the market's real month-end trading day (SPY calendar) counts. No rule
 was changed; the first run's numbers are void.
+Change 2 (same day): yearly figures were filed under the year each monthly period ended (so "2019" held
+December 2018); now filed under the month held. Totals were unaffected.

@@ -133,7 +133,7 @@ def run(stage: str, final: bool = False) -> str:
     out, yearly = {}, {}
     for v in VARIANTS:
         s = simulate(u, px, spy, v, start, end)
-        s["year"] = s.t1.dt.year
+        s["year"] = s.t0.dt.year                 # the month held (t0 = first trading day of it)
         y = s.groupby("year").apply(lambda g: pd.Series({"strat": (1 + g.ret).prod() - 1, "spy": (1 + g.spy).prod() - 1}))
         yearly[v] = y
         tot, tot_spy = (1 + s.ret).prod() - 1, (1 + s.spy).prod() - 1
