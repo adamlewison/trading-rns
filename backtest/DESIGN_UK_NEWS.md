@@ -89,3 +89,10 @@ position, 40 slots, UK cost table, stamp duty on Main Market buys. Run ONCE on 2
 `backtest.uk_news final --final --labels`. Verdict: the account's actual £ result vs holding the FTSE
 All-Share with the same £4,800 (index price return + 3.5%/yr for dividends, which the price index omits),
 summed over the period; also reported vs the AIM/SmallCap benchmark per trade. Not changed afterwards.
+
+## FINAL TEST RESULT (2022 → 2026-11, run once, 2026-11-13): fails the pass rule
+S1L + H20, £4,800 account: actual £ result 2022 −611, 2023 −946, 2024 +787, 2025 −140, 2026 +1,293 =
+**+£383**, vs the same money in the FTSE All-Share (price + 3.5%/yr dividends) **+£2,241**. Versus the
+AIM/SmallCap benchmark per trade it was ahead: +677 / −493 / +765 / −766 / +1,303 = **+£1,486** (gross
+2.18/1.49/3.54/1.03/4.11% vs costs 2.70–2.95%). So the picks beat UK small caps, but UK small caps
+lagged the market so badly that the account earned far less than an index fund. Fails as defined.
