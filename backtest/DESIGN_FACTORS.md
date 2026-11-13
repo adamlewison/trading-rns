@@ -50,3 +50,10 @@ and wrong SPY years. Fixed: only the market's real month-end trading day (SPY ca
 was changed; the first run's numbers are void.
 Change 2 (same day): yearly figures were filed under the year each monthly period ended (so "2019" held
 December 2018); now filed under the month held. Totals were unaffected.
+
+## Choose-period result (2013–2021, after the fixes, run 2026-11-13): fails the pass rule, no final test
+Per year after costs vs SPY 16.2%: **Quality 17.3%** (total +319% vs +288%; beat SPY in 4 of 9 years; also
+ahead over 2013–2019), Value 12.6% (3/9), Momentum 10.6% (2/9), QVM 7.7% (2/9). Quality misses the
+"at least 5 of 9 years" rule, so nothing goes to the final test. Survivorship check: of the large filers
+(public float ≥ $5bn) 29% had no price in 2013, 17% in 2019, 3% in 2026: the early years miss a big slice
+of the large-company world, so even large-cap results here are not clean.

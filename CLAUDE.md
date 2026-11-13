@@ -49,6 +49,8 @@ then paper trading, then small size.
 - **UK news drift with Luna labels**: passed 2019–2021 narrowly, **failed its final test** (2022 → now: +£383
   vs £2,241 for a FTSE All-Share fund; it did beat the small-cap index by £1,486).
 - **UK director buying** passed 2019–2021 (+£780) but **failed its final test** (2022 → now: −£1,888 vs a FTSE fund).
+- **Large-company factor portfolio** (top 30 of 500, monthly) failed its pass rule on 2013–2021: quality alone
+  17.3%/yr vs SPY 16.2% but beat it in only 4 of 9 years; value, momentum and the mix lagged.
 - **Next:** user to choose (section 7).
 - **The user's account:** about $6,000, around $150 per trade, Trading 212, holds up to ~20 days.
 - Droplet runner (`trading-rns-agent`) installed 2026-11-12: agents reach the droplet themselves (~6s a command).
@@ -131,6 +133,7 @@ then paper trading, then small size.
 | Leveraged trend: 2× (or 1.5×) S&P 500 fund only while the trend is up, else T-bills; modelled with financing, fees, daily reset | **Failed the final test.** Won 1994–2021 (16.3%/yr vs SPY 10.7%) by sidestepping 2001–02 and 2008, but 2022 → now made +7% vs SPY +69% (worst fall −49% vs −25%): the choppy 2022 bear whipsawed the monthly signal and leverage doubled each miss | `backtest/DESIGN_LEVERAGED_TREND.md` |
 | UK RNS news drift, no LLM: pre-open announcements by headline category or a model, buy at the 08:00 open, hold 1–20 days or ATR bracket | **Failed on 2019–2021** (final years unused): gross drift −8% to +2.5% per event vs 2.4–2.8% round-trip costs; all 60 variants lost; closest was the model's picks held 20 days (+2.5% gross vs 2.8% cost) | `backtest/DESIGN_UK_NEWS.md` |
 | UK director buying: director/PDMR purchases (from the Luna labels, pre-open only), all or ≥ £20k, held 20/60 days or trailing stop, vs a FTSE All-Share fund | **Failed the final test.** ≥ £20k held 60 days won 2019–21 (+£780, mostly 2020) but lost −£1,888 in 2022 → now; before costs the picks trailed the index (−0.4% a trade). Every variant lost | `backtest/DESIGN_UK_DIRECTORS.md` |
+| US large-company factors (value, quality, momentum, combined), top 30 of the 500 largest, monthly, $6k | **Failed the pass rule** on 2013–2021: quality 17.3%/yr vs SPY 16.2% (beat it in 4 of 9 years; 5 required); the others lagged (7.7–12.6%). Also measured survivorship without buying data: 29% of large filers in 2013 have no price (3% in 2026) | `backtest/DESIGN_FACTORS.md` |
 | UK news drift **with Luna labels** (55,654 announcements labelled, £14.11): model on baseline + label features, 20-day hold | **Failed the final test.** 2019–21 just passed (+£193; without labels −£638). 2022 → now: account +£383 vs FTSE All-Share fund +£2,241; it beat the AIM/SmallCap index by +£1,486 (3 of 5 years), but small caps lagged so badly that beating them wasn't enough | `backtest/DESIGN_UK_NEWS.md` |
 
 Every strategy whose final test ran has spent its final years: further work on them can only be judged live (paper trading)
@@ -160,7 +163,8 @@ small caps.
 ## 8. Assumptions and biases (⚠️ = could make results look better than reality)
 
 **Every test**
-- **⚠️ Survivorship:** see lesson 8. UK: of 420 delisted companies with announcements, 43 have prices.
+- **⚠️ Survivorship:** see lesson 8. UK: of 420 delisted companies with announcements, 43 have prices. US large
+  companies (public float ≥ $5bn in filings): 29% have no price in 2013, 17% in 2019, 3% in 2026 (`backtest/factors.py`).
 - **⚠️ LLM hindsight:** see lesson 4. A judgement label must not predict clearly better before the
   model's training cutoff than after it.
 - **⚠️ Many tries:** see lesson 5. **Capacity:** without the account simulation every trade is funded.
