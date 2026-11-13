@@ -57,3 +57,18 @@ tradable 2012–2021. Fit years (seen before the run): +0.1% to +0.7% over 5 day
 gross excess of −8% to +2.5% per event. All 60 variants (11 categories + the model × 5 exits) lost to the
 benchmark after costs; none positive in more than one year. Closest: the model's picks held 20 days
 (+2.46% gross vs 2.76% cost, −£638 over three years on a £4,800 account). Final years not used.
+
+## Addendum: the labelled test (written 2026-11-13, BEFORE any labelled result was looked at)
+The user approved Luna labels for the 55,654 announcements of priced events (`uk-rns-full-v1-20261113T064938`,
+£14.11). Same events, costs, account, years and benchmark as above. Labels are aggregated per event
+(company-day): any "ahead of expectations", any "below", any "in line"; outlook raised / lowered /
+withdrawn; profit improved / worse; news for shareholders (share positive, any negative); max
+materiality; mean tone; any funding risk; director buy value and sell value (GBP k); fundraise discount
+(max) and amount; contract value; the LLM categories as flags.
+- **S1L model:** LightGBM (same fixed settings) on the baseline features **plus** the label features,
+  predicting the H5 excess return; buy above last year's top-quintile prediction.
+- **S2 "ahead":** every event saying results are ahead of market expectations, or outlook raised, with no
+  funding risk (a simple rule, no fitting).
+- Exits O1, H3, H5, H20, A5 as before. The baseline model (S1, no labels) is re-run beside them.
+**Pass to the final test:** the account beats the benchmark after costs in total over 2019–2021 and in at
+least 2 of the 3 years. If several pass, the user chooses one to freeze.
