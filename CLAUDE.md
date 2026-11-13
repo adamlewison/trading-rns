@@ -48,8 +48,8 @@ then paper trading, then small size.
   6,388 compare results with market expectations (1,826 ahead, 3,870 in line, 446 below); 1,785 flag funding risk.
 - **UK news drift with Luna labels**: passed 2019–2021 narrowly, **failed its final test** (2022 → now: +£383
   vs £2,241 for a FTSE All-Share fund; it did beat the small-cap index by £1,486).
-- **UK director buying (2019–2021):** buys ≥ £20k held 60 days **passed** (+£780 vs a FTSE All-Share fund;
-  3 of 6 variants passed). Waiting for the user to choose one to freeze for the final test (`backtest/DESIGN_UK_DIRECTORS.md`).
+- **UK director buying** passed 2019–2021 (+£780) but **failed its final test** (2022 → now: −£1,888 vs a FTSE fund).
+- **Next:** user to choose (section 7).
 - **The user's account:** about $6,000, around $150 per trade, Trading 212, holds up to ~20 days.
 - Droplet runner (`trading-rns-agent`) installed 2026-11-12: agents reach the droplet themselves (~6s a command).
 - US Luna leftovers: 150,457 of 150,518 labelled; 13 small batches still at OpenAI (`luna-run` on the droplet). When done: `classify.labels build`, then `features.us_earnings_labels build`.
@@ -108,6 +108,8 @@ then paper trading, then small size.
 9. **Infrastructure:** on the 1GB droplet every DuckDB connection needs `ROW_GROUP_SIZE 8192`
    (`core.db.connect`); OpenAI batches stall or expire after 24h, so runners must resume and survive
    refused calls; run long droplet jobs with `systemd-run ... -p Restart=on-failure`.
+14. **2020 flatters everything that buys small or beaten-down stocks.** Four strategies looked good on
+    2019–21 mainly through the 2020 rebound and failed on 2022–26. Distrust a choose-period win driven by 2020.
 10. **Models drift towards beaten-down, volatile stocks** (they had the biggest past rebounds). Such edges
     depend on the market regime (2020 rebound) and are the most flattered by missing failed companies.
 
@@ -128,6 +130,7 @@ then paper trading, then small size.
 | ETF trend-following / momentum (Faber GTAA-5, dual momentum, top-3-of-10, S&P timing), monthly, 2007–2021 | **Failed the pass rule** (beat holding the S&P 500): best 9.1%/yr vs 10.8% for SPY; halved the worst falls (−22% vs −55%) but lost through whipsaws in a long bull market | `backtest/DESIGN_ETF_TREND.md` |
 | Leveraged trend: 2× (or 1.5×) S&P 500 fund only while the trend is up, else T-bills; modelled with financing, fees, daily reset | **Failed the final test.** Won 1994–2021 (16.3%/yr vs SPY 10.7%) by sidestepping 2001–02 and 2008, but 2022 → now made +7% vs SPY +69% (worst fall −49% vs −25%): the choppy 2022 bear whipsawed the monthly signal and leverage doubled each miss | `backtest/DESIGN_LEVERAGED_TREND.md` |
 | UK RNS news drift, no LLM: pre-open announcements by headline category or a model, buy at the 08:00 open, hold 1–20 days or ATR bracket | **Failed on 2019–2021** (final years unused): gross drift −8% to +2.5% per event vs 2.4–2.8% round-trip costs; all 60 variants lost; closest was the model's picks held 20 days (+2.5% gross vs 2.8% cost) | `backtest/DESIGN_UK_NEWS.md` |
+| UK director buying: director/PDMR purchases (from the Luna labels, pre-open only), all or ≥ £20k, held 20/60 days or trailing stop, vs a FTSE All-Share fund | **Failed the final test.** ≥ £20k held 60 days won 2019–21 (+£780, mostly 2020) but lost −£1,888 in 2022 → now; before costs the picks trailed the index (−0.4% a trade). Every variant lost | `backtest/DESIGN_UK_DIRECTORS.md` |
 | UK news drift **with Luna labels** (55,654 announcements labelled, £14.11): model on baseline + label features, 20-day hold | **Failed the final test.** 2019–21 just passed (+£193; without labels −£638). 2022 → now: account +£383 vs FTSE All-Share fund +£2,241; it beat the AIM/SmallCap index by +£1,486 (3 of 5 years), but small caps lagged so badly that beating them wasn't enough | `backtest/DESIGN_UK_NEWS.md` |
 
 Every strategy whose final test ran has spent its final years: further work on them can only be judged live (paper trading)
@@ -140,7 +143,6 @@ or with delisted prices. Open lead: the insider model's small-stock picks (worth
 | 1 | **US news drift** (deals, CEO exits, profit warnings) | have it (421,832 filings) | ~$140 | Only with a reason to expect a bigger effect than earnings |
 
 
-Also: **UK director dealings** (RNS) is untested; the US result lowers its priority.
 1. **US news drift.** The earnings pipeline on other 8-Ks; only with a reason to expect a bigger effect.
 
 **Exit ideas** (tools applied per strategy, fixed before each test):

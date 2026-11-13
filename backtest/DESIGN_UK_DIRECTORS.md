@@ -50,3 +50,9 @@ prices), and only pre-open announcements were labelled. Next: the user chooses o
 open, sold at the close of day 60; £120 per position, 40 slots, UK cost table and stamp duty. Run ONCE on
 2022 → latest with `backtest.uk_directors final --final`. Pass = beats the FTSE All-Share (with dividends)
 after costs in total over the period. The other 5 variants are printed for information only.
+
+## FINAL TEST RESULT (2022 → 2026-11, run once, 2026-11-13): fails
+S1 + H60, £ vs the FTSE All-Share with dividends: 2022 −806, 2023 −980, 2024 −420, 2025 +390, 2026 −71 =
+**−£1,888** (actual account −£159). Gross −0.41% per trade vs the index before 2.45% costs: no edge at all.
+All 6 variants lost over the period (−£1,855 to −£4,764). The 2019–2021 result (+£780, mostly 2020's
+rebound) did not carry over: UK small caps that directors bought kept lagging the broad market in 2022–2025.
