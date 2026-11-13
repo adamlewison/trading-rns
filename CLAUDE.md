@@ -48,7 +48,8 @@ then paper trading, then small size.
   6,388 compare results with market expectations (1,826 ahead, 3,870 in line, 446 below); 1,785 flag funding risk.
 - **UK news drift with Luna labels**: passed 2019–2021 narrowly, **failed its final test** (2022 → now: +£383
   vs £2,241 for a FTSE All-Share fund; it did beat the small-cap index by £1,486).
-- **Next:** user to choose (section 7).
+- **UK director buying (2019–2021):** buys ≥ £20k held 60 days **passed** (+£780 vs a FTSE All-Share fund;
+  3 of 6 variants passed). Waiting for the user to choose one to freeze for the final test (`backtest/DESIGN_UK_DIRECTORS.md`).
 - **The user's account:** about $6,000, around $150 per trade, Trading 212, holds up to ~20 days.
 - Droplet runner (`trading-rns-agent`) installed 2026-11-12: agents reach the droplet themselves (~6s a command).
 - US Luna leftovers: 150,457 of 150,518 labelled; 13 small batches still at OpenAI (`luna-run` on the droplet). When done: `classify.labels build`, then `features.us_earnings_labels build`.

@@ -36,3 +36,11 @@ Choose 2019–2021 (2012–2018 seen only to check the data); final 2022 → lat
 ## Known risks
 ⚠️ Survivorship (27% of UK news from delisted companies without prices), worst for small caps.
 Few events (a few hundred a year), so results are noisy.
+
+## Choose-years result (2019–2021, run 2026-11-13)
+798 tradable director-purchase events 2012–2021 (109 / 148 / 220 in 2019 / 2020 / 2021). 6 variants, £ vs
+the FTSE All-Share with dividends, after costs: **S1 (≥ £20k) + H60 +£780** (−250 / +654 / +376; gross 3.98% vs
+2.35% costs); S0 + H60 +£652 (−653 / +1,088 / +217); S1 + H20 +£347 (−10 / +60 / +296); S0 + H20 −£6;
+both trailing-stop variants negative. Three variants meet the pass rule. Caveats: few events (209 for
+S1 + H60 over three years), 2020's rebound contributes most, survivorship (failed small companies have no
+prices), and only pre-open announcements were labelled. Next: the user chooses one to freeze.
