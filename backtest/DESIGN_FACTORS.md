@@ -63,3 +63,8 @@ The user chose to run the final test on **Quality** although it met only 4 of th
 Frozen exactly as above: top 30 of the 500 largest by the quality score (ROE, operating margin, low
 leverage), equal weight, monthly, Trading 212 costs. Run ONCE on 2022-01 → latest. Pass = beats SPY (total
 return) over the period. The other three variants print for information only.
+
+## FINAL TEST RESULT (2022-01 → 2026-11, run once): fails
+Quality +41.7% (7.2%/yr) vs SPY +64.0% (10.4%/yr); beat SPY in 2 of 5 years. For information only (they
+failed the choose period, so choosing them now would be hindsight): Value +78.3%, QVM +78.4%, Momentum
++73.6%. Across both periods every variant won in one and lost in the other: no consistent edge.
