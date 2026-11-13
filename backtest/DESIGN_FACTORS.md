@@ -57,3 +57,9 @@ ahead over 2013–2019), Value 12.6% (3/9), Momentum 10.6% (2/9), QVM 7.7% (2/9)
 "at least 5 of 9 years" rule, so nothing goes to the final test. Survivorship check: of the large filers
 (public float ≥ $5bn) 29% had no price in 2013, 17% in 2019, 3% in 2026: the early years miss a big slice
 of the large-company world, so even large-cap results here are not clean.
+
+## FROZEN for the final test (2026-11-13): user override of the pass rule
+The user chose to run the final test on **Quality** although it met only 4 of the 9-year rule (5 required).
+Frozen exactly as above: top 30 of the 500 largest by the quality score (ROE, operating margin, low
+leverage), equal weight, monthly, Trading 212 costs. Run ONCE on 2022-01 → latest. Pass = beats SPY (total
+return) over the period. The other three variants print for information only.
