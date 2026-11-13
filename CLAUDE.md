@@ -46,7 +46,8 @@ then paper trading, then small size.
 - **UK labels done 2026-11-13:** 55,654/55,654 announcements, £14.11, 0 errors
   (`data/labels/uk-rns-full-v1-20261113T064938.parquet`; re-create with `classify.uk_news report NAME`).
   6,388 compare results with market expectations (1,826 ahead, 3,870 in line, 446 below); 1,785 flag funding risk.
-- **Next:** the labelled UK news test (no-LLM baseline in `backtest/DESIGN_UK_NEWS.md` to beat). Waiting for the user's OK.
+- **UK labelled test (2019–2021):** model + Luna labels, hold 20 days, **just passed** (+£193 over 3 years,
+  2 of 3 years positive; without labels −£638). Waiting for the user to decide on freezing it for the final test.
 - **The user's account:** about $6,000, around $150 per trade, Trading 212, holds up to ~20 days.
 - Droplet runner (`trading-rns-agent`) installed 2026-11-12: agents reach the droplet themselves (~6s a command).
 - US Luna leftovers: 150,457 of 150,518 labelled; 13 small batches still at OpenAI (`luna-run` on the droplet). When done: `classify.labels build`, then `features.us_earnings_labels build`.

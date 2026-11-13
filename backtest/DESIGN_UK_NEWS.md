@@ -72,3 +72,12 @@ materiality; mean tone; any funding risk; director buy value and sell value (GBP
 - Exits O1, H3, H5, H20, A5 as before. The baseline model (S1, no labels) is re-run beside them.
 **Pass to the final test:** the account beats the benchmark after costs in total over 2019–2021 and in at
 least 2 of the 3 years. If several pass, the user chooses one to freeze.
+
+## Labelled choose-years result (2019–2021, run 2026-11-13)
+15 variants (S1L model with labels, S2 "ahead" rule, baseline S1 re-run; × 5 exits). Only one met the pass
+rule: **S1L (model + labels) held 20 days: +£54 / −£354 / +£493 = +£193** vs the AIM/SmallCap benchmark
+(gross +2.69% per trade vs 2.66% costs; 1,237 trades taken). The same model without labels: −£638.
+The "ahead of expectations" rule: −£377 (only 2019 positive). Every 1/3/5-day and ATR-bracket variant lost
+every year. The margin is razor-thin (≈1.3% a year on the account) and 75 UK variants have now been
+looked at, so the result is flattered by selection; survivorship (27% of news from delisted companies
+without prices) flatters it further. Next: the user decides whether to freeze S1L + H20 for the final test.
