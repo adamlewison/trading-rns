@@ -55,6 +55,7 @@ then paper trading, then small size.
   (V, Q, M, QVM; frozen rules in `backtest/DESIGN_FACTORS.md`), droplet timer `trading-rns-paper` weekdays
   22:30 UTC, first rebalance **2026-12-01**. Results: `uv run python -W ignore -m paper.factors status`, or
   B2 `trading-rns/paper/status.md`. Judge after ≥ 12 months; no picking a winner early.
+- **2026-11-14:** six new ideas outside stock-picking added to section 7 (untested); waiting for the user to pick one.
 - **The user's account:** about $6,000, around $150 per trade, Trading 212, holds up to ~20 days.
 - Droplet runner (`trading-rns-agent`) installed 2026-11-12: agents reach the droplet themselves (~6s a command).
 - US Luna leftovers: 150,457 of 150,518 labelled; 13 small batches still at OpenAI (`luna-run` on the droplet). When done: `classify.labels build`, then `features.us_earnings_labels build`.
@@ -117,6 +118,10 @@ then paper trading, then small size.
     between 2013–21 and 2022–26; only consistency across both counts.
 14. **2020 flatters everything that buys small or beaten-down stocks.** Four strategies looked good on
     2019–21 mainly through the 2020 rebound and failed on 2022–26. Distrust a choose-period win driven by 2020.
+16. **Our final test can't tell a small edge from luck, and we fished where professionals fish.** A 30–40
+    stock portfolio strays ~10% a year from the index, so over 2022 → now a ±20-point gap is one standard
+    deviation of chance (quality's −22 points is that). Prefer trades with a large, structural edge per trade
+    (someone forced to sell, or a prize too small for funds), judged per trade against the index over the same days.
 10. **Models drift towards beaten-down, volatile stocks** (they had the biggest past rebounds). Such edges
     depend on the market regime (2020 rebound) and are the most flattered by missing failed companies.
 
@@ -148,10 +153,16 @@ or with delisted prices. Open lead: the insider model's small-stock picks (worth
 
 | # | Strategy | Data | LLM cost | Why here |
 |---|---|---|---|---|
-| 1 | **US news drift** (deals, CEO exits, profit warnings) | have it (421,832 filings) | ~$140 | Only with a reason to expect a bigger effect than earnings |
+| 1 | **Odd-lot tender offers** (US): issuer self-tenders where holders of < 100 shares aren't scaled back; buy ≤ 99 shares below the tender price, tender them | EDGAR SC TO-I filings (not yet pulled); issuers survive, so prices exist | ~$5 | An edge capped at ~$3–10k a deal, so funds can't take it. Needs a broker that passes on tender elections (IBKR does; check Trading 212) |
+| 2 | **UK investment trust discounts**: buy equity trusts when the discount to NAV is wide vs their own history (or a wind-down / tender / continuation vote is due), sell when it narrows | NAVs are in RNS; trusts aren't in our universe yet | none | Index-like assets bought below value; wound-up trusts paid out near NAV, so missing delisted prices hurt rather than flatter. Longer holds (months) |
+| 3 | **UK retail offers** (PrimaryBid / RetailBook): take placing stock at the discount, sell on admission | have it (RNS + labels) | none | Discount normally reserved for institutions; no stamp duty on new shares. Watch for scale-back in the good deals; needs a second broker |
+| 4 | **UK possible offers**: buy targets after a Rule 2.4 announcement, hold to the 28-day put-up-or-shut-up deadline | RNS has them; ⚠️ acquired targets have no prices, so paper/live only or buy delisted prices | small | Known deadline inside the 20-day hold; pays if firm bids and raised bids are under-priced |
+| 5 | **Year-end tax-loss rebound**: buy the year's worst small caps / widest-discount trusts in late December, sell in January | have it | none | Forced, non-economic sellers; one trade a year, so few independent tests |
+| 6 | **Prediction markets** (LLM forecasts vs prices; near-certain contracts) | new (Kalshi / Polymarket / Betfair APIs) | small | Thin markets, weak competition, reading is the edge. Only where the user may legally trade |
+| 7 | **US news drift** (deals, CEO exits, profit warnings) | have it (421,832 filings) | ~$140 | Only with a reason to expect a bigger effect than earnings |
 
-
-1. **US news drift.** The earnings pipeline on other 8-Ks; only with a reason to expect a bigger effect.
+Ideas 1–6 were proposed 2026-11-14 after a step back (lesson 16): none is tested, each needs its design file
+first. Sparse strategies assume idle cash sits in the index fund and are judged per trade against it.
 
 **Exit ideas** (tools applied per strategy, fixed before each test):
 - **A. Targets scaled to each stock's normal move (default):** target and stop as multiples of the
