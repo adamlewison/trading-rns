@@ -80,3 +80,18 @@ Choose: 2015–2021 (2013–2014 only build the 12-month history). Final: 2022 �
 - Trap: a full-sample mean or standard deviation in z. Only the previous 12 months.
 - Trap: trusts with share classes or subscription shares (several tickers per trust). One line per trust:
   the ordinary shares.
+
+## Changes and state (2026-11-16, before any NAV or outcome was looked at)
+- **Universe:** the 288 tickers LSE lists under "Closed-ended investment funds" (current list only, so
+  trusts that have since wound up are missing). The split into equity and other trusts is made at step 0
+  by NAV frequency: keep trusts with at least 40 NAV announcements a year (weekly or daily).
+- **Prices:** Yahoo's UK `close` is adjusted for later share splits and consolidations (found in the
+  retail-offers test). The discount needs the actual price on the NAV date: fetch prices with their
+  split history (`yfinance` actions) and undo later splits, as for US stocks. Add a unit test with a split.
+- **Data pull running on the droplet** (unit `trust-data`, log `/opt/trading-rns-pm/data/logs/trust_data.out`,
+  restartable): first the announcement index of the 288 trusts (`index --mode company`), then the text of
+  the last "Net Asset Value" announcement of each trust-month (`bodies --headline-re "^net asset value"
+  --month-last`). Expect roughly 4 + 7 hours at Investegate's 2 requests a second. Before this, the index
+  held NAV announcements for only about 50 tickers.
+- Next, in a cloud session once the unit has finished and the UK backup has reached B2: pull the UK data,
+  parse the NAVs (regex first), fetch trust prices with splits, then step 0 as written above.

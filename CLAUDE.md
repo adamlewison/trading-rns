@@ -60,7 +60,8 @@ then paper trading, then small size.
 - **The user's preference (2026-11-15):** short trades (hours to days) whose gains are reinvested (lesson 17).
 - **State 2026-11-16** (plans in section 7, procedure in `backtest/RUNBOOK.md`): tax-loss rebound and crypto trend
   have failed (section 6). **UK retail offers:** choose period run (to end-2024): too small to judge and wholly
-  dependent on allocation (section 7); texts and labels are done (£0.38). **Prediction markets:**
+  dependent on allocation (section 7); texts and labels are done (£0.38). **Trust discounts:** the data pull runs on the droplet (unit `trust-data`, ~11 h;
+  next steps in its design). **Prediction markets:**
   the Kalshi listing runs on the droplet (unit `kalshi-list`); next steps in `DESIGN_PM_FAVOURITES.md` ("State").
   **Odd-lot tenders:** public sources say a UK holder has 15% of gross proceeds withheld unless the broker accepts a
   Section 302 certificate; whether IBKR does is unknown and decides the track (the user is asking IBKR).
@@ -179,7 +180,7 @@ Each has a full plan written 2026-11-15 **before any data or result was seen**. 
 | 1 | **Odd-lot tender offers** (US): buy ≤ 99 shares below a company's own tender price and tender them | `DESIGN_ODD_LOT.md` | EDGAR SC TO-I pull; Luna < $5. **Blocked on one question to IBKR:** does it accept a Section 302 certificate so that tender proceeds are not withheld at 15%? (research in the design) | A prize too small for funds; capped, so it adds income but does not compound |
 | 2 | **UK retail offers** (PrimaryBid / RetailBook): placing stock at the discount, sold on admission | `DESIGN_UK_RETAIL_OFFERS.md` | a live record of real allocations (apply for the minimum in each offer); final period 2025 → unused | **Too small to judge** (50 usable offers to end-2024; 100 required). Filled in full: +4.7% over the index per offer in 11 days (t 2.9); if popular offers are scaled back to a quarter: +0.7% (t 1.0). Allocation decides it and can only be measured live. ⚠️ survivorship flatters |
 | 3 | **Prediction-market near-certainties** (Kalshi history): buy contracts at 90–98c days before they settle | `DESIGN_PM_FAVOURITES.md`; ingest and backtest written, not run | the droplet's listing to finish, then 1–2 h of candles | Closest real thing to "1–3% in days", stakes compound. ⚠️ Kalshi and Polymarket are closed to UK residents: a pass is evidence only, then Betfair data is needed |
-| 5 | **UK investment trust discounts**: buy equity trusts when the discount is wide vs their own 12 months | `DESIGN_UK_TRUST_DISCOUNTS.md` | trust universe, prices, ~50,000 NAV pages (7 h) | Clearest reason to beat an index, but holds of months (not the user's preference) and the most data work |
+| 5 | **UK investment trust discounts**: buy equity trusts when the discount is wide vs their own 12 months | `DESIGN_UK_TRUST_DISCOUNTS.md` | the droplet's pull (unit `trust-data`) to finish, then NAV parsing and prices with split history | Clearest reason to beat an index, but holds of months (not the user's preference) and the most data work |
 | 7 | **US news drift** (deals, CEO exits, profit warnings) | none | Luna ~$140 | Only with a reason to expect a bigger effect than earnings |
 
 **Run order for a cheaper model:** 3, 2, then 1 once IBKR has answered, then 5. One at a time; stop and report after each choose run.
@@ -285,7 +286,7 @@ small caps.
 **Droplet details**
 - UK checkout `/opt/trading-rns` (services `trading-rns-scrape`, `trading-rns-backup`); US checkout
   `/opt/trading-rns-us` (services `trading-rns-us`, `trading-rns-us-backup`, plus one-off units such
-  as `luna-run`, `us-splits`). `/opt/trading-rns-pm` (this branch, uses the US checkout's venv and `.env`): unit `kalshi-list`. Setup: `bash deploy/setup-uk.sh` / `bash deploy/setup-us.sh`. Logs in
+  as `luna-run`, `us-splits`). `/opt/trading-rns-pm` (this branch, uses the US checkout's venv and `.env`): units `kalshi-list`, `trust-data` (its `data/uk.duckdb` and `data/raw/uk` are links to the UK checkout). Setup: `bash deploy/setup-uk.sh` / `bash deploy/setup-us.sh`. Logs in
   `data/logs/`. Run long one-off jobs with `systemd-run --unit=NAME -p Restart=on-failure ...`.
 - Each backup loop pushes every 30 minutes and uploads a status file; read it from anywhere with
   `core.backup status --remote --profile uk|us`.
