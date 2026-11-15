@@ -55,7 +55,9 @@ then paper trading, then small size.
   (V, Q, M, QVM; frozen rules in `backtest/DESIGN_FACTORS.md`), droplet timer `trading-rns-paper` weekdays
   22:30 UTC, first rebalance **2026-12-01**. Results: `uv run python -W ignore -m paper.factors status`, or
   B2 `trading-rns/paper/status.md`. Judge after ≥ 12 months; no picking a winner early.
-- **2026-11-14:** six new ideas outside stock-picking added to section 7 (untested); waiting for the user to pick one.
+- **Odd-lot tender offers (idea 1) chosen 2026-11-15;** the user has opened an IBKR account. Design written
+  (`backtest/DESIGN_ODD_LOT.md`), nothing pulled or run. **Waiting on the user:** IBKR's answers on withholding
+  tax for non-US holders, odd-lot elections, fees and cut-off (phase 0 of the design), then the go-ahead for data.
 - **The user's account:** about $6,000, around $150 per trade, Trading 212, holds up to ~20 days.
 - Droplet runner (`trading-rns-agent`) installed 2026-11-12: agents reach the droplet themselves (~6s a command).
 - US Luna leftovers: 150,457 of 150,518 labelled; 13 small batches still at OpenAI (`luna-run` on the droplet). When done: `classify.labels build`, then `features.us_earnings_labels build`.
@@ -153,7 +155,7 @@ or with delisted prices. Open lead: the insider model's small-stock picks (worth
 
 | # | Strategy | Data | LLM cost | Why here |
 |---|---|---|---|---|
-| 1 | **Odd-lot tender offers** (US): issuer self-tenders where holders of < 100 shares aren't scaled back; buy ≤ 99 shares below the tender price, tender them | EDGAR SC TO-I filings (not yet pulled); issuers survive, so prices exist | ~$5 | An edge capped at ~$3–10k a deal, so funds can't take it. Needs a broker that passes on tender elections (IBKR does; check Trading 212) |
+| 1 | **Odd-lot tender offers** (US): issuer self-tenders where holders of < 100 shares aren't scaled back; buy ≤ 99 shares below the tender price, tender them | EDGAR SC TO-I filings (not yet pulled); issuers survive, so prices exist | ~$5 | An edge capped at ~$3–10k a deal, so funds can't take it. Design: `backtest/DESIGN_ODD_LOT.md`. ⚠️ Non-US holders may have 15–30% of gross proceeds withheld: check with IBKR first |
 | 2 | **UK investment trust discounts**: buy equity trusts when the discount to NAV is wide vs their own history (or a wind-down / tender / continuation vote is due), sell when it narrows | NAVs are in RNS; trusts aren't in our universe yet | none | Index-like assets bought below value; wound-up trusts paid out near NAV, so missing delisted prices hurt rather than flatter. Longer holds (months) |
 | 3 | **UK retail offers** (PrimaryBid / RetailBook): take placing stock at the discount, sell on admission | have it (RNS + labels) | none | Discount normally reserved for institutions; no stamp duty on new shares. Watch for scale-back in the good deals; needs a second broker |
 | 4 | **UK possible offers**: buy targets after a Rule 2.4 announcement, hold to the 28-day put-up-or-shut-up deadline | RNS has them; ⚠️ acquired targets have no prices, so paper/live only or buy delisted prices | small | Known deadline inside the 20-day hold; pays if firm bids and raised bids are under-priced |
