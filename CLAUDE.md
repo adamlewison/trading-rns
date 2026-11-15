@@ -58,7 +58,9 @@ then paper trading, then small size.
 - **Odd-lot tender offers (idea 1) chosen 2026-11-15;** the user has opened an IBKR account. Design written
   (`backtest/DESIGN_ODD_LOT.md`), nothing pulled or run. **Waiting on the user:** IBKR's answers on withholding
   tax for non-US holders, odd-lot elections, fees and cut-off (phase 0 of the design), then the go-ahead for data.
-- **The user's account:** about $6,000, around $150 per trade, Trading 212, holds up to ~20 days.
+- **The user's account:** about $6,000, around $150 per trade, Trading 212 (IBKR opened 2026-11-15), holds up to ~20 days.
+- **The user's preference (2026-11-15):** short trades (hours to days) whose gains are reinvested so the account
+  compounds fast. Section 7 is ordered with that in mind (lesson 17); waiting for the user to pick the next test.
 - Droplet runner (`trading-rns-agent`) installed 2026-11-12: agents reach the droplet themselves (~6s a command).
 - US Luna leftovers: 150,457 of 150,518 labelled; 13 small batches still at OpenAI (`luna-run` on the droplet). When done: `classify.labels build`, then `features.us_earnings_labels build`.
 
@@ -124,6 +126,10 @@ then paper trading, then small size.
     stock portfolio strays ~10% a year from the index, so over 2022 → now a ±20-point gap is one standard
     deviation of chance (quality's −22 points is that). Prefer trades with a large, structural edge per trade
     (someone forced to sell, or a prize too small for funds), judged per trade against the index over the same days.
+17. **Fast compounding needs near-certain trades, not bigger targets.** 1% a day is 12× a year (the best fund
+    ever made ~66%); growth comes from how reliable the edge is and how often capital turns over, and only a
+    reliable edge can be sized large. Fixed $150 slots (2.5% of the account) cannot compound whatever the edge.
+    Exits were never the problem: entries had ≈0% edge before costs, and no exit rule fixes that.
 10. **Models drift towards beaten-down, volatile stocks** (they had the biggest past rebounds). Such edges
     depend on the market regime (2020 rebound) and are the most flattered by missing failed companies.
 
@@ -160,8 +166,9 @@ or with delisted prices. Open lead: the insider model's small-stock picks (worth
 | 3 | **UK retail offers** (PrimaryBid / RetailBook): take placing stock at the discount, sell on admission | have it (RNS + labels) | none | Discount normally reserved for institutions; no stamp duty on new shares. Watch for scale-back in the good deals; needs a second broker |
 | 4 | **UK possible offers**: buy targets after a Rule 2.4 announcement, hold to the 28-day put-up-or-shut-up deadline | RNS has them; ⚠️ acquired targets have no prices, so paper/live only or buy delisted prices | small | Known deadline inside the 20-day hold; pays if firm bids and raised bids are under-priced |
 | 5 | **Year-end tax-loss rebound**: buy the year's worst small caps / widest-discount trusts in late December, sell in January | have it | none | Forced, non-economic sellers; one trade a year, so few independent tests |
-| 6 | **Prediction markets** (LLM forecasts vs prices; near-certain contracts) | new (Kalshi / Polymarket / Betfair APIs) | small | Thin markets, weak competition, reading is the edge. Only where the user may legally trade |
-| 7 | **US news drift** (deals, CEO exits, profit warnings) | have it (421,832 filings) | ~$140 | Only with a reason to expect a bigger effect than earnings |
+| 6 | **Prediction markets** (LLM forecasts vs prices; near-certain contracts) | new (Kalshi / Polymarket / Betfair APIs) | small | Thin markets, weak competition, reading is the edge; contracts at 95–99c resolving in days are the closest real thing to "1–3% in days" (a wrong one loses the whole stake, so many small independent bets). Free price history allows a backtest before any account. Only where the user may legally trade |
+| 7 | **Crypto trend** (spot majors, daily bars, sized by volatility; in cash when the trend is down) | free exchange history from 2017 | none | Fits short holds and low costs (~0.1–0.2%), open 24/7; documented momentum, but decayed and mostly crypto beta. Low prior; judge vs holding BTC and vs the index |
+| 8 | **US news drift** (deals, CEO exits, profit warnings) | have it (421,832 filings) | ~$140 | Only with a reason to expect a bigger effect than earnings |
 
 Ideas 1–6 were proposed 2026-11-14 after a step back (lesson 16): none is tested, each needs its design file
 first. Sparse strategies assume idle cash sits in the index fund and are judged per trade against it.
