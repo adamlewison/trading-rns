@@ -25,7 +25,7 @@ import httpx
 BASE = "https://api.elections.kalshi.com/trade-api/v2"
 UA = "trading-rns-research/0.1 (personal non-commercial research; python-httpx)"
 ROOT = Path("data/pm/kalshi")
-RATE_PER_S = 5.0
+RATE_PER_S = 4.0
 MIN_VOLUME = 1000.0            # contracts, lifetime (design: eligible market)
 MAX_CANDLE_MARKETS = 150_000   # design: fixed random sample above this
 WINDOW_DAYS = 8
@@ -66,8 +66,8 @@ class Client:
             if r.status_code == 200:
                 with self.lock:
                     self.ok_run += 1
-                    if self.ok_run >= 300:
-                        self.ok_run, self.rate = 0, min(RATE_PER_S, self.rate * 1.1)
+                    if self.ok_run >= 100:
+                        self.ok_run, self.rate = 0, min(RATE_PER_S, self.rate * 1.25)
                 return r.json()
             if r.status_code == 404:
                 return None
