@@ -61,8 +61,8 @@ then paper trading, then small size.
 - **Handover (2026-11-15):** plans for the remaining ideas are in section 7, procedure in `backtest/RUNBOOK.md`.
   Run so far: tax-loss rebound (failed, section 6); crypto trend passed its choose period and **waits for the
   user's go-ahead to run the final test once** (section 7). UK retail offers stopped at step 0 (too few
-  before 2022; a changed split is proposed in its design). Kalshi download in progress for the prediction-market test
-  (`backtest/pm_favourites.py` written, not run). Waiting on IBKR's answers for the odd-lot test.
+  before 2022; a changed split is proposed in its design). The Kalshi listing for the prediction-market test runs on the
+  droplet (unit `kalshi-list`, ~8–10 h, then uploads to B2); next steps are in `DESIGN_PM_FAVOURITES.md` ("State"). Waiting on IBKR's answers for the odd-lot test.
 - Droplet runner (`trading-rns-agent`) installed 2026-11-12: agents reach the droplet themselves (~6s a command).
 - US Luna leftovers: 150,457 of 150,518 labelled; 13 small batches still at OpenAI (`luna-run` on the droplet). When done: `classify.labels build`, then `features.us_earnings_labels build`.
 
@@ -138,7 +138,7 @@ then paper trading, then small size.
 ## 5. Markets compared
 - **Prediction markets:** Kalshi and Polymarket are closed to UK residents (no Gambling Commission licence;
   checked 2026-11-15). UK-legal venues are Betfair, Smarkets and Matchbook. Kalshi's public data API needs no
-  account but answers 429 above ~5 requests a second; Betfair's free price files gave 403 here; Smarkets'
+  account but answers 429 above ~1–2 requests a second; Betfair's free price files gave 403 here; Smarkets'
   public API lists no settled markets.
 - **US** (SEC 8-Ks, Trading 212 or IBKR): free, official, timestamped filings; no stamp duty;
   tight spreads on liquid stocks; crowded with professionals.
@@ -174,7 +174,7 @@ Each has a full plan written 2026-11-15 **before any data or result was seen**. 
 |---|---|---|---|---|
 | 1 | **Odd-lot tender offers** (US): buy ≤ 99 shares below a company's own tender price and tender them | `DESIGN_ODD_LOT.md` | EDGAR SC TO-I pull; Luna < $5. **Blocked until IBKR answers** (withholding tax for UK holders, odd-lot elections, fee, cut-off) | A prize too small for funds; capped, so it adds income but does not compound |
 | 2 | **UK retail offers** (PrimaryBid / RetailBook): placing stock at the discount, sold on admission | `DESIGN_UK_RETAIL_OFFERS.md` | **Stopped at step 0:** 146 priced launches before 2022 (150 required, and the count includes non-retail notices); most activity is 2024–26. Needs the user's OK to move the split to end-2024 and ~1,000 page fetches on the droplet | Days to weeks, 5–10% discount; judged under an adverse scale-back assumption. ⚠️ survivorship flatters |
-| 3 | **Prediction-market near-certainties** (Kalshi history): buy contracts at 90–98c days before they settle | `DESIGN_PM_FAVOURITES.md`; ingest `ingest/pm/kalshi.py` written, backtest not | 2–3 h of polite downloading | Closest real thing to "1–3% in days", stakes compound. ⚠️ Kalshi and Polymarket are closed to UK residents: a pass is evidence only, then Betfair data is needed |
+| 3 | **Prediction-market near-certainties** (Kalshi history): buy contracts at 90–98c days before they settle | `DESIGN_PM_FAVOURITES.md`; ingest and backtest written, not run | the droplet's listing to finish, then 1–2 h of candles | Closest real thing to "1–3% in days", stakes compound. ⚠️ Kalshi and Polymarket are closed to UK residents: a pass is evidence only, then Betfair data is needed |
 | 5 | **UK investment trust discounts**: buy equity trusts when the discount is wide vs their own 12 months | `DESIGN_UK_TRUST_DISCOUNTS.md` | trust universe, prices, ~50,000 NAV pages (7 h) | Clearest reason to beat an index, but holds of months (not the user's preference) and the most data work |
 | 6 | **Crypto trend** (BTC, ETH; in when above the 100-day average, sized by volatility) | `DESIGN_CRYPTO_TREND.md` | the user's go-ahead for the final test | **Passed 2018-06 → 2021** (M100-V: +446%, Sharpe 1.60 vs 1.12 for holding the coins, worst fall −26% vs −76%; SPY +85%). One crash and one bull market, so fragile (lesson 11). Final test on 2022 → now not run; proposed freeze M100-V |
 | 7 | **US news drift** (deals, CEO exits, profit warnings) | none | Luna ~$140 | Only with a reason to expect a bigger effect than earnings |
@@ -280,7 +280,7 @@ small caps.
 **Droplet details**
 - UK checkout `/opt/trading-rns` (services `trading-rns-scrape`, `trading-rns-backup`); US checkout
   `/opt/trading-rns-us` (services `trading-rns-us`, `trading-rns-us-backup`, plus one-off units such
-  as `luna-run`, `us-splits`). Setup: `bash deploy/setup-uk.sh` / `bash deploy/setup-us.sh`. Logs in
+  as `luna-run`, `us-splits`). `/opt/trading-rns-pm` (this branch, uses the US checkout's venv and `.env`): unit `kalshi-list`. Setup: `bash deploy/setup-uk.sh` / `bash deploy/setup-us.sh`. Logs in
   `data/logs/`. Run long one-off jobs with `systemd-run --unit=NAME -p Restart=on-failure ...`.
 - Each backup loop pushes every 30 minutes and uploads a status file; read it from anywhere with
   `core.backup status --remote --profile uk|us`.
@@ -306,7 +306,8 @@ uv run python -W ignore -m features.us_earnings build && uv run python -W ignore
 uv run python -W ignore -m backtest.us_account choose --hold 20          # final runs need --final, once
 uv run python -W ignore -m backtest.crypto_trend data|choose             # final needs --final, once
 uv run python -W ignore -m backtest.us_tax_loss choose                  # needs data/us_min/*.parquet (docstring)
-uv run python -W ignore -m ingest.pm.kalshi series|markets|candles|status  # Kalshi history (resumable, ≤5 req/s)
+uv run python -W ignore -m ingest.pm.kalshi series|markets|candles|status|upload|download  # Kalshi history (resumable, ~1–2 req/s)
+uv run python -W ignore -m backtest.pm_favourites check|choose            # final needs --final, once
 ```
 Backups never lose data: local files are deleted only after a verified upload, and a push never
 replaces a table snapshot with an empty one. Only the US loop prunes cached SEC pages.

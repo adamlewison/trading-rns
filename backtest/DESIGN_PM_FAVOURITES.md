@@ -125,3 +125,15 @@ bets first. Equity for sizing = cash + cost of open bets.
 - Sports games are decided in hours; pre-game favourites at 95c are rare, so most sports bets will be
   in-play prices from the final hours. Report sports separately and without it.
 - Even a pass is **not tradable from the UK today**. The report must say so in its first line.
+
+## State (2026-11-15, late): listing runs on the droplet; backtest written, not run
+- Kalshi tolerates only about 1–2 requests a second without an account, so the listing takes roughly
+  8–10 hours. It runs on the droplet as unit `kalshi-list` (checkout `/opt/trading-rns-pm`, restartable,
+  log `data/logs/kalshi_list.out`) and uploads to B2 `trading-rns/pm/v1/kalshi/` when finished. Only one
+  machine may pull at a time: two would be working around the limit.
+- To continue in a cloud session once the droplet log says "uploaded": `ingest.pm.kalshi download`, then
+  `backtest.pm_favourites check` (step 0 and the scheduled-end check), `ingest.pm.kalshi candles` (about
+  4,000 requests, 1–2 hours), `ingest.pm.kalshi upload`, then `backtest.pm_favourites choose`.
+- `backtest/pm_favourites.py` implements steps 1–4 and is unit-tested on hand-made markets
+  (`tests/test_pm_favourites.py`); it has never been run on real data. SPY for the comparison comes from
+  `data/us_min/us_etf_daily.parquet` (B2 `trading-rns/us/v1/db/us_etf_daily.parquet`).
