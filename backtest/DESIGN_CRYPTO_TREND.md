@@ -111,3 +111,10 @@ is lower risk. The final period (2022 →) contains a crash and a recovery and i
 **Proposed freeze:** M100-V (highest Sharpe, shallowest fall, beat SPY in all three years, fewest
 assumptions). The final test runs once, after the user agrees: `backtest.crypto_trend final --final`
 prints all variants; only the frozen one counts.
+
+## FROZEN for the final test (2026-11-16, user agreed)
+**M100-V:** each of BTC and ETH is held only while its close is above its 100-day average, at a weight
+of min(50%, 50% × 40% ÷ 30-day volatility), traded one day after the signal, 0.45% cost each way.
+Run ONCE on 2022-01-01 → latest with `backtest.crypto_trend final --final`. Pass = beats SPY in total
+return, worst fall no deeper than 50%, and a higher Sharpe ratio than holding 50/50 BTC/ETH. The other
+variants are printed for information only.
