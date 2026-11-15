@@ -90,3 +90,26 @@ by platform and by year, and the offers dropped for missing prices.
   last close before the launch only (the adverse-allocation rule is a penalty, not a signal).
 - Trap: treating the announcement of results as the launch (the offer is already closed by then).
 - Trap: an offer conditional on a general meeting that then fails is a cancelled offer, not a missing one.
+
+## Step 0 result (2026-11-15): STOPPED, too few offers before 2022 (no outcome was looked at)
+Candidate launch announcements (headline match, "result" headlines excluded) and how many are for a
+ticker with a clean price on or just before the announcement day:
+
+| Year | 2012–15 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Launches | 153 | 40 | 82 | 33 | 61 | 87 | 142 | 95 | 123 | 185 | 213 | 212 |
+| Priced | 7 | 13 | 31 | 8 | 13 | 28 | 46 | 24 | 58 | 107 | 130 | 122 |
+
+- Priced launches up to 2021: **146**, below the 150 the design requires, and that count is inflated:
+  the headline match also catches VCT "offer for subscription" notices and institutional "accelerated
+  bookbuild" notices, which are not retail offers. Real retail offers before 2022 are probably under 100.
+- Most activity is in 2024–2026, which the design reserves for the final test.
+- Only about a fifth of launches have their text stored (evening announcements were not fetched), so
+  about 1,000 pages would need fetching from Investegate, from the droplet (the only machine that scrapes).
+- Most launches have no price because the company is outside our universe (larger Main Market
+  companies, trusts, VCTs).
+
+**Proposed change, awaiting the user (made on counts only):** move the split so the choose period is
+launches up to 2024-12-31 and the final period is 2025-01-01 → latest; drop "offer for subscription"
+and "bookbuild" from the headline match; fetch the missing texts on the droplet. Without this change
+the verdict is "too small to judge".

@@ -60,7 +60,9 @@ then paper trading, then small size.
 - **The user's preference (2026-11-15):** short trades (hours to days) whose gains are reinvested (lesson 17).
 - **Handover (2026-11-15):** plans for the remaining ideas are in section 7, procedure in `backtest/RUNBOOK.md`.
   Run so far: tax-loss rebound (failed, section 6); crypto trend passed its choose period and **waits for the
-  user's go-ahead to run the final test once** (section 7). Waiting on IBKR's answers for the odd-lot test.
+  user's go-ahead to run the final test once** (section 7). UK retail offers stopped at step 0 (too few
+  before 2022; a changed split is proposed in its design). Kalshi download in progress for the prediction-market test
+  (`backtest/pm_favourites.py` written, not run). Waiting on IBKR's answers for the odd-lot test.
 - Droplet runner (`trading-rns-agent`) installed 2026-11-12: agents reach the droplet themselves (~6s a command).
 - US Luna leftovers: 150,457 of 150,518 labelled; 13 small batches still at OpenAI (`luna-run` on the droplet). When done: `classify.labels build`, then `features.us_earnings_labels build`.
 
@@ -171,7 +173,7 @@ Each has a full plan written 2026-11-15 **before any data or result was seen**. 
 | # | Strategy | Plan | Needs | Why here |
 |---|---|---|---|---|
 | 1 | **Odd-lot tender offers** (US): buy ≤ 99 shares below a company's own tender price and tender them | `DESIGN_ODD_LOT.md` | EDGAR SC TO-I pull; Luna < $5. **Blocked until IBKR answers** (withholding tax for UK holders, odd-lot elections, fee, cut-off) | A prize too small for funds; capped, so it adds income but does not compound |
-| 2 | **UK retail offers** (PrimaryBid / RetailBook): placing stock at the discount, sold on admission | `DESIGN_UK_RETAIL_OFFERS.md` | have RNS; Luna < £2; a second broker to trade it | Days to weeks, 5–10% discount; judged under an adverse scale-back assumption. ⚠️ survivorship flatters |
+| 2 | **UK retail offers** (PrimaryBid / RetailBook): placing stock at the discount, sold on admission | `DESIGN_UK_RETAIL_OFFERS.md` | **Stopped at step 0:** 146 priced launches before 2022 (150 required, and the count includes non-retail notices); most activity is 2024–26. Needs the user's OK to move the split to end-2024 and ~1,000 page fetches on the droplet | Days to weeks, 5–10% discount; judged under an adverse scale-back assumption. ⚠️ survivorship flatters |
 | 3 | **Prediction-market near-certainties** (Kalshi history): buy contracts at 90–98c days before they settle | `DESIGN_PM_FAVOURITES.md`; ingest `ingest/pm/kalshi.py` written, backtest not | 2–3 h of polite downloading | Closest real thing to "1–3% in days", stakes compound. ⚠️ Kalshi and Polymarket are closed to UK residents: a pass is evidence only, then Betfair data is needed |
 | 5 | **UK investment trust discounts**: buy equity trusts when the discount is wide vs their own 12 months | `DESIGN_UK_TRUST_DISCOUNTS.md` | trust universe, prices, ~50,000 NAV pages (7 h) | Clearest reason to beat an index, but holds of months (not the user's preference) and the most data work |
 | 6 | **Crypto trend** (BTC, ETH; in when above the 100-day average, sized by volatility) | `DESIGN_CRYPTO_TREND.md` | the user's go-ahead for the final test | **Passed 2018-06 → 2021** (M100-V: +446%, Sharpe 1.60 vs 1.12 for holding the coins, worst fall −26% vs −76%; SPY +85%). One crash and one bull market, so fragile (lesson 11). Final test on 2022 → now not run; proposed freeze M100-V |
