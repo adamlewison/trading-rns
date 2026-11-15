@@ -70,3 +70,44 @@ market, number of trades, costs paid. Then the same with BTC only (ETH's short h
   also uses it as the trade price (same error as above).
 - Trap: trying other averages (50, 150, 200 days) "to check robustness" and then reporting the best.
   Any extra run is a variant, is reported, and counts against the result.
+
+## Step 0 result (2026-11-15)
+BTC-USD 2014-09-17 → 2026-11-15 and ETH-USD 2017-11-09 → 2026-11-15 from yfinance, no missing days.
+Cross-check against Coinbase's daily candles on 20 random dates per coin: largest difference 1.7% (BTC),
+0.6% (ETH); none above 2%.
+
+## Choose-period result (2018-06-01 → 2021-12-31, run 2026-11-15): three variants PASS to the final test
+$6,000 start, costs 0.45% each way. Final period (2022 →) not looked at.
+
+| Variant | Total return | Sharpe | Worst fall | 2018 (from June) | 2019 | 2020 | 2021 | Avg invested | Trading days | Costs | Verdict |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| M100-V | +446% | 1.60 | −26% | −7% | +59% | +133% | +58% | 35% | 107 | $1,971 | pass |
+| M100-F | +906% | 1.40 | −47% | −10% | +81% | +167% | +131% | 59% | 81 | $5,297 | pass |
+| R28-V | +357% | 1.48 | −37% | −24% | +21% | +185% | +73% | 34% | 219 | $3,008 | pass |
+| R28-F | +911% | 1.43 | −55% | −31% | +4% | +394% | +178% | 58% | 198 | $8,498 | fail (worst fall beyond −50%) |
+| Hold 50/50 BTC/ETH | +650% | 1.12 | −76% | −65% | +35% | +397% | +206% | 100% | | $252 | benchmark |
+| SPY | +85% | 0.92 | −34% | −7% | +31% | +18% | +29% | 100% | | | benchmark |
+
+BTC only (ETH's half in cash): M100-V +140%, Sharpe 1.44, worst fall −12%; holding 50% BTC +215%,
+Sharpe 1.06, worst fall −37%.
+
+**Checks**
+- Too-good rule (an account more than doubling in a year): explained by the asset, not the rule.
+  Holding the coins made +397% in 2020; the benchmark's yearly numbers match the known moves of BTC and
+  ETH; the unit tests confirm trades happen one day after the signal and that changing later prices
+  does not change earlier signals.
+- Placebo (the same signals moved to a random other time, 200 draws): Sharpe averages 0.5–0.7 against
+  1.4–1.6 for the real signals; 0.5–2% of placebo runs match the real Sharpe. The timing adds something
+  in this period beyond holding crypto part of the time.
+- Where it comes from (M100-V vs holding): the rule sat out the second half of 2018 (−7% vs −65%) and
+  halved every drawdown; in 2020 and 2021 it made far **less** than holding (+133% vs +397%, +58% vs +206%).
+  Over 2019–2021 alone the Sharpe ratios are close (1.82 vs 1.68).
+
+**What this does and does not show.** ⚠️ The period is one crash and one bull market, so two episodes
+decide it (lesson 11: the leveraged equity trend rule passed 28 years on the same logic and then failed).
+Beating SPY here comes from owning crypto in 2019–2021, not from the rule; the rule's own contribution
+is lower risk. The final period (2022 →) contains a crash and a recovery and is the real test.
+
+**Proposed freeze:** M100-V (highest Sharpe, shallowest fall, beat SPY in all three years, fewest
+assumptions). The final test runs once, after the user agrees: `backtest.crypto_trend final --final`
+prints all variants; only the frozen one counts.

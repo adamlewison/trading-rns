@@ -59,7 +59,8 @@ then paper trading, then small size.
 - **The user's account:** about $6,000, around $150 per trade, Trading 212 (IBKR opened 2026-11-15), holds up to ~20 days.
 - **The user's preference (2026-11-15):** short trades (hours to days) whose gains are reinvested (lesson 17).
 - **Handover (2026-11-15):** plans for the remaining ideas are in section 7, procedure in `backtest/RUNBOOK.md`.
-  Run so far: tax-loss rebound (failed, section 6). Waiting on IBKR's answers for the odd-lot test.
+  Run so far: tax-loss rebound (failed, section 6); crypto trend passed its choose period and **waits for the
+  user's go-ahead to run the final test once** (section 7). Waiting on IBKR's answers for the odd-lot test.
 - Droplet runner (`trading-rns-agent`) installed 2026-11-12: agents reach the droplet themselves (~6s a command).
 - US Luna leftovers: 150,457 of 150,518 labelled; 13 small batches still at OpenAI (`luna-run` on the droplet). When done: `classify.labels build`, then `features.us_earnings_labels build`.
 
@@ -173,10 +174,10 @@ Each has a full plan written 2026-11-15 **before any data or result was seen**. 
 | 2 | **UK retail offers** (PrimaryBid / RetailBook): placing stock at the discount, sold on admission | `DESIGN_UK_RETAIL_OFFERS.md` | have RNS; Luna < £2; a second broker to trade it | Days to weeks, 5–10% discount; judged under an adverse scale-back assumption. ⚠️ survivorship flatters |
 | 3 | **Prediction-market near-certainties** (Kalshi history): buy contracts at 90–98c days before they settle | `DESIGN_PM_FAVOURITES.md`; ingest `ingest/pm/kalshi.py` written, backtest not | 2–3 h of polite downloading | Closest real thing to "1–3% in days", stakes compound. ⚠️ Kalshi and Polymarket are closed to UK residents: a pass is evidence only, then Betfair data is needed |
 | 5 | **UK investment trust discounts**: buy equity trusts when the discount is wide vs their own 12 months | `DESIGN_UK_TRUST_DISCOUNTS.md` | trust universe, prices, ~50,000 NAV pages (7 h) | Clearest reason to beat an index, but holds of months (not the user's preference) and the most data work |
-| 6 | **Crypto trend** (BTC, ETH; in when the trend is up, sized by volatility) | `DESIGN_CRYPTO_TREND.md` | yfinance only | Short trades, cheap to test; low prior (mostly crypto beta) |
+| 6 | **Crypto trend** (BTC, ETH; in when above the 100-day average, sized by volatility) | `DESIGN_CRYPTO_TREND.md` | the user's go-ahead for the final test | **Passed 2018-06 → 2021** (M100-V: +446%, Sharpe 1.60 vs 1.12 for holding the coins, worst fall −26% vs −76%; SPY +85%). One crash and one bull market, so fragile (lesson 11). Final test on 2022 → now not run; proposed freeze M100-V |
 | 7 | **US news drift** (deals, CEO exits, profit warnings) | none | Luna ~$140 | Only with a reason to expect a bigger effect than earnings |
 
-**Run order for a cheaper model:** 6, 3, 2, then 1 once IBKR has answered, then 5. One at a time; stop and report after each choose run.
+**Run order for a cheaper model:** 3, 2, then 1 once IBKR has answered, then 5. One at a time; stop and report after each choose run.
 Not planned: **UK possible offers** (Rule 2.4, hold to the 28-day deadline): acquired targets have no
 prices, so it needs delisted data first. Sparse strategies assume idle cash sits in the index fund.
 
@@ -301,6 +302,7 @@ uv run python -W ignore -m classify.openai_full run --max-gbp 55|status  # Luna 
 uv run python -W ignore -m classify.labels build|report
 uv run python -W ignore -m features.us_earnings build && uv run python -W ignore -m features.us_earnings_labels build
 uv run python -W ignore -m backtest.us_account choose --hold 20          # final runs need --final, once
+uv run python -W ignore -m backtest.crypto_trend data|choose             # final needs --final, once
 uv run python -W ignore -m backtest.us_tax_loss choose                  # needs data/us_min/*.parquet (docstring)
 uv run python -W ignore -m ingest.pm.kalshi series|markets|candles|status  # Kalshi history (resumable, ≤5 req/s)
 ```
