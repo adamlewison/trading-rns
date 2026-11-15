@@ -58,11 +58,12 @@ then paper trading, then small size.
   B2 `trading-rns/paper/status.md`. Judge after ≥ 12 months; no picking a winner early.
 - **The user's account:** about $6,000, around $150 per trade, Trading 212 (IBKR opened 2026-11-15), holds up to ~20 days.
 - **The user's preference (2026-11-15):** short trades (hours to days) whose gains are reinvested (lesson 17).
-- **Handover (2026-11-15):** plans for the remaining ideas are in section 7, procedure in `backtest/RUNBOOK.md`.
-  Run so far: tax-loss rebound (failed, section 6); crypto trend passed its choose period and **waits for the
-  user's go-ahead to run the final test once** (section 7). UK retail offers stopped at step 0 (too few
-  before 2022; a changed split is proposed in its design). The Kalshi listing for the prediction-market test runs on the
-  droplet (unit `kalshi-list`, ~8–10 h, then uploads to B2); next steps are in `DESIGN_PM_FAVOURITES.md` ("State"). Waiting on IBKR's answers for the odd-lot test.
+- **State 2026-11-16** (plans in section 7, procedure in `backtest/RUNBOOK.md`): tax-loss rebound and crypto trend
+  have failed (section 6). **UK retail offers:** the user agreed to a choose period up to end-2024; 677 announcement
+  texts are being fetched on the droplet (unit `retail-bodies`), then labels and the choose run. **Prediction markets:**
+  the Kalshi listing runs on the droplet (unit `kalshi-list`); next steps in `DESIGN_PM_FAVOURITES.md` ("State").
+  **Odd-lot tenders:** public sources say a UK holder has 15% of gross proceeds withheld unless the broker accepts a
+  Section 302 certificate; whether IBKR does is unknown and decides the track (the user is asking IBKR).
 - Droplet runner (`trading-rns-agent`) installed 2026-11-12: agents reach the droplet themselves (~6s a command).
 - US Luna leftovers: 150,457 of 150,518 labelled; 13 small batches still at OpenAI (`luna-run` on the droplet). When done: `classify.labels build`, then `features.us_earnings_labels build`.
 
@@ -112,7 +113,8 @@ then paper trading, then small size.
     in 2022–26 but earned far less than the FTSE All-Share. Judge against what the user would otherwise hold.
 12. **OpenAI's batch queue can sit idle for hours** (UK pilot: 0/500 after 8.5h). For runs under ~£20 the
     direct API (2× price, `--sync`) finishes in hours; keep batches for big runs.
-11. **Trend-following lowers risk but lags buy-and-hold in bull markets** (2007–2021: 9.1% vs 10.8%/yr).
+11. **Trend-following lowers risk but lags buy-and-hold in bull markets** (2007–2021: 9.1% vs 10.8%/yr; crypto
+    2022–26: it beat holding the coins but made +22% vs SPY +69%).
     Adding leverage made it beat the index over 1994–2021 (two slow crashes it dodged) and lose badly in
     2022–26 (a choppy bear it didn't): its result rests on a handful of crash episodes, so it's fragile.
 8. **Survivorship:** almost no prices for delisted companies (US or UK); every result is flattered
@@ -162,6 +164,8 @@ then paper trading, then small size.
 
 | US year-end tax-loss rebound: the 30 worst small/mid caps of the year, bought 5 trading days before year-end, sold on January's 10th or 20th trading day | **Failed on Decembers 2012–2020** (final years unused): beat SPY in 6 of 9 years (7 required); mean +2.4% to +4.2% vs SPY but ≈0% without the best year, and January 2016 lost 23%. No pick ever stopped trading: the failures are missing from the data | `backtest/DESIGN_TAX_LOSS.md` |
 
+| Crypto trend on BTC and ETH: hold each coin only while above its 100-day average (or 28-day return > 0), sized by volatility or flat, 0.45% costs | **Failed the final test.** Passed 2018-06 → 2021 (M100-V +446%, Sharpe 1.60 vs 1.12 for holding the coins; SPY +85%), but 2022 → now made +22% vs SPY +69%: it halved the falls and beat holding the coins (−13%), but crypto went nowhere and trading cost $1,887 | `backtest/DESIGN_CRYPTO_TREND.md` |
+
 Every strategy whose final test ran has spent its final years: further work on them can only be judged live (paper trading)
 or with delisted prices. Open lead: the insider model's small-stock picks (worth a paper trial).
 
@@ -172,11 +176,10 @@ Each has a full plan written 2026-11-15 **before any data or result was seen**. 
 
 | # | Strategy | Plan | Needs | Why here |
 |---|---|---|---|---|
-| 1 | **Odd-lot tender offers** (US): buy ≤ 99 shares below a company's own tender price and tender them | `DESIGN_ODD_LOT.md` | EDGAR SC TO-I pull; Luna < $5. **Blocked until IBKR answers** (withholding tax for UK holders, odd-lot elections, fee, cut-off) | A prize too small for funds; capped, so it adds income but does not compound |
-| 2 | **UK retail offers** (PrimaryBid / RetailBook): placing stock at the discount, sold on admission | `DESIGN_UK_RETAIL_OFFERS.md` | **Stopped at step 0:** 146 priced launches before 2022 (150 required, and the count includes non-retail notices); most activity is 2024–26. Needs the user's OK to move the split to end-2024 and ~1,000 page fetches on the droplet | Days to weeks, 5–10% discount; judged under an adverse scale-back assumption. ⚠️ survivorship flatters |
+| 1 | **Odd-lot tender offers** (US): buy ≤ 99 shares below a company's own tender price and tender them | `DESIGN_ODD_LOT.md` | EDGAR SC TO-I pull; Luna < $5. **Blocked on one question to IBKR:** does it accept a Section 302 certificate so that tender proceeds are not withheld at 15%? (research in the design) | A prize too small for funds; capped, so it adds income but does not compound |
+| 2 | **UK retail offers** (PrimaryBid / RetailBook): placing stock at the discount, sold on admission | `DESIGN_UK_RETAIL_OFFERS.md` | texts being fetched (677 pages), then Luna < £2; a second broker to trade it | Days to weeks, 5–10% discount; choose period now up to end-2024 (too few offers before 2022); judged under an adverse scale-back assumption. ⚠️ survivorship flatters |
 | 3 | **Prediction-market near-certainties** (Kalshi history): buy contracts at 90–98c days before they settle | `DESIGN_PM_FAVOURITES.md`; ingest and backtest written, not run | the droplet's listing to finish, then 1–2 h of candles | Closest real thing to "1–3% in days", stakes compound. ⚠️ Kalshi and Polymarket are closed to UK residents: a pass is evidence only, then Betfair data is needed |
 | 5 | **UK investment trust discounts**: buy equity trusts when the discount is wide vs their own 12 months | `DESIGN_UK_TRUST_DISCOUNTS.md` | trust universe, prices, ~50,000 NAV pages (7 h) | Clearest reason to beat an index, but holds of months (not the user's preference) and the most data work |
-| 6 | **Crypto trend** (BTC, ETH; in when above the 100-day average, sized by volatility) | `DESIGN_CRYPTO_TREND.md` | the user's go-ahead for the final test | **Passed 2018-06 → 2021** (M100-V: +446%, Sharpe 1.60 vs 1.12 for holding the coins, worst fall −26% vs −76%; SPY +85%). One crash and one bull market, so fragile (lesson 11). Final test on 2022 → now not run; proposed freeze M100-V |
 | 7 | **US news drift** (deals, CEO exits, profit warnings) | none | Luna ~$140 | Only with a reason to expect a bigger effect than earnings |
 
 **Run order for a cheaper model:** 3, 2, then 1 once IBKR has answered, then 5. One at a time; stop and report after each choose run.

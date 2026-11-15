@@ -136,14 +136,19 @@ def index_daily(start: date, end: date, refresh: bool) -> None:
         d += timedelta(days=1)
 
 
-def fetch_bodies(limit: int | None, randomise: bool, tickers: list[str] | None = None) -> None:
+def fetch_bodies(limit: int | None, randomise: bool, tickers: list[str] | None = None,
+                 headline_re: str | None = None) -> None:
     cfg = uk_cfg()["announcements"]
     src = get_source()
-    where = ["NOT i.is_admin", "b.ann_id IS NULL"]
-    if cfg["bodies_only_for_universe"]:
-        where.append("i.tidm IN (SELECT tidm FROM universe)")
-    if cfg["bodies_only_pre_open"]:
-        where.append("i.pre_open")
+    where = ["b.ann_id IS NULL"]
+    if headline_re:          # a named set (e.g. retail offers): any time of day, any company, admin or not
+        where.append("regexp_matches(lower(i.headline), '" + headline_re.replace("'", "''") + "')")
+    else:
+        where.append("NOT i.is_admin")
+        if cfg["bodies_only_for_universe"]:
+            where.append("i.tidm IN (SELECT tidm FROM universe)")
+        if cfg["bodies_only_pre_open"]:
+            where.append("i.pre_open")
     if tickers:
         where.append("i.tidm IN (" + ",".join(f"'{t}'" for t in tickers) + ")")
     order = "random()" if randomise else "i.published_uk DESC"
@@ -255,6 +260,7 @@ if __name__ == "__main__":
     ap.add_argument("--limit", type=int)
     ap.add_argument("--sample", type=int, help="random sample of N universe tickers (company mode)")
     ap.add_argument("--random", action="store_true", help="bodies: random order")
+    ap.add_argument("--headline-re", help="bodies: fetch every announcement whose lower-cased headline matches")
     ap.add_argument("--refresh", action="store_true")
     ap.add_argument("--start", type=date.fromisoformat)
     ap.add_argument("--end", type=date.fromisoformat)
@@ -267,7 +273,7 @@ if __name__ == "__main__":
             s, e = date_range(load_config())
             index_daily(a.start or s, a.end or e, a.refresh)
     elif a.cmd == "bodies":
-        fetch_bodies(a.limit, a.random, a.tickers)
+        fetch_bodies(a.limit, a.random, a.tickers, a.headline_re)
     elif a.cmd == "reclassify":
         reclassify()
     elif a.cmd == "build":

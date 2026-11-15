@@ -127,3 +127,19 @@ press release (final price and that odd lots were not prorated).
 **What would make the conclusion wrong:** (a) counting offers without odd-lot priority, where the
 holder is scaled back and left with shares that fall after expiry; (b) using the split-adjusted price;
 (c) dropping terminated offers; (d) ignoring withholding tax, which the backtest cannot see.
+
+## Phase 0 research (2026-11-16, public sources only; IBKR itself has not answered)
+- **Withholding (the blocker).** Offer documents say the same thing in each case checked (Triumph
+  Bancorp 2022, PHH 2017, Santander Consumer 2020): 30% of the **gross** proceeds paid to a non-US
+  holder is withheld, or the treaty rate with a valid W-8BEN (15% for a UK resident). It can be avoided
+  only if the withholding agent accepts a certificate that the holder meets a Section 302 test (for
+  example "complete termination": all shares sold); holders at a broker are told to ask the broker
+  whether it offers that certificate. Otherwise the holder must claim a refund from the IRS.
+- **Whether IBKR offers that certificate could not be found** in its public pages or in user reports.
+  If it does not, a UK holder loses 15% of the proceeds up front to earn a gap of a few percent, with
+  a refund only through a US tax filing: not workable. This one question decides the track.
+- **Deadline:** IBKR asks for elections by 12:00 ET on the day before the offer expires (earlier in
+  some regions); later requests are best-efforts. The design's "2 trading days before expiry" stands.
+- **Odd-lot election and fee:** not stated publicly. Offer documents say a broker "may charge a fee".
+- Odd-lot terms confirmed in a real offer: fewer than 100 shares owned, all of them tendered, and the
+  odd-lot box completed; modified Dutch auctions give a price range (for example $51–58).

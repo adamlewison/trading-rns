@@ -113,3 +113,13 @@ ticker with a clean price on or just before the announcement day:
 launches up to 2024-12-31 and the final period is 2025-01-01 → latest; drop "offer for subscription"
 and "bookbuild" from the headline match; fetch the missing texts on the droplet. Without this change
 the verdict is "too small to judge".
+
+## Changes (2026-11-16, agreed by the user, made on counts only: no price outcome has been looked at)
+- **Split:** choose = launches up to 2024-12-31; final = 2025-01-01 → latest.
+- **Headline match:** `retail offer|primarybid|retailbook` only (this still covers WRAP and REX retail
+  offers). "Offer for subscription" (mostly VCTs) and "bookbuild" (institutional) are dropped.
+- **Texts:** every announcement matching that pattern, launches and results, is fetched on the droplet
+  (`ingest.uk.announcements.run bodies --headline-re ...`). Admission day = the date in the "result"
+  announcement if it gives one, else the expected date in the launch announcement.
+- Pass rule unchanged (≥ 100 offers, adverse allocation, t ≥ 3 by launch week); "still positive with 2020
+  removed" stays.

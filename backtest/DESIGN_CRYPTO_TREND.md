@@ -118,3 +118,16 @@ of min(50%, 50% × 40% ÷ 30-day volatility), traded one day after the signal, 0
 Run ONCE on 2022-01-01 → latest with `backtest.crypto_trend final --final`. Pass = beats SPY in total
 return, worst fall no deeper than 50%, and a higher Sharpe ratio than holding 50/50 BTC/ETH. The other
 variants are printed for information only.
+
+## FINAL TEST RESULT (2022-01-01 → 2026-11-15, run once, 2026-11-16): FAILS
+| | Total return | Sharpe | Worst fall | 2022 | 2023 | 2024 | 2025 | 2026 |
+|---|---|---|---|---|---|---|---|---|
+| **M100-V (frozen)** | **+22%** | 0.29 | −36% | −32% | +40% | +24% | +11% | −9% |
+| SPY | +69% | 0.71 | −25% | −18% | +26% | +25% | +18% | +12% |
+| Hold 50/50 BTC/ETH | −13% | 0.24 | −68% | −66% | +121% | +74% | −6% | −33% |
+
+M100-V made +22% against +69% for SPY, so it fails the pass rule (beat SPY). It did what a trend rule
+does: it lost half as much as holding the coins and ended ahead of them, but crypto itself went nowhere
+over these five years, and 168 trading days cost $1,887 on a $6,000 account. For information: the other
+variants made +19% to +26%, all below SPY; BTC alone +35% (M100-V) against +38% for holding 50% BTC.
+The choose-period pass came from owning crypto in a boom, as warned. The final years are now spent.
