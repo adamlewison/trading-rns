@@ -81,3 +81,49 @@ Choose 2012–2021 (deals are too few for three years); final 2022 → latest, *
 ## After the backtest (only if it passes)
 A daily droplet job that reads new `SC TO-I` filings, labels them and reports open deals with their gap;
 paper trading first, then one small real deal to confirm IBKR's handling.
+
+## Execution steps (detail added 2026-11-15, still before any data; follow `backtest/RUNBOOK.md`)
+Phase 0 must be answered by the user first. If IBKR withholds tax on the proceeds for a UK holder and
+no exemption is available, record the track as blocked in `CLAUDE.md` and stop: do not build anything.
+
+**Step 0, data checks (no outcomes).**
+1. In the EDGAR quarterly index (`form.idx`), list the form types beginning `SC TO` or `SCHEDULE TO` and
+   count filings per year for each. Expect a few hundred `SC TO-I` a year, most from unlisted funds.
+2. Join to the ticker map and `us_prices_daily`. Report per year: filings, distinct offers (group
+   `SC TO-I` plus its `/A` amendments by CIK and a gap of more than 120 days between filings), and offers
+   with a price on the filing date. If fewer than 15 priced offers a year on average, report and stop.
+
+**Step 1, documents.** For each priced offer download the filing index page (acceptance time, as for
+8-Ks: never the submissions JSON), the Offer to Purchase from the first filing, and every amendment's
+main document and press-release exhibit. Text only. Extend `ingest/us/` (new table, e.g. `us_tenders`).
+
+**Step 2, labels.** One row per offer with these fields, each either copied from the text or null:
+`offer_type` (fixed | dutch), `price` or `price_low` and `price_high`, `shares_sought`, `expiry_date`
+(the first one), `odd_lot_priority` (true only if the text says odd-lot holders who tender all their
+shares are not subject to proration), `security` (must be common stock; drop preferred, units, notes),
+`conditions`; from amendments: `extended_to` (list), `terminated` (date), `final_price`, `proration_pct`,
+`results_date`. Regex first; Luna only for what regex leaves null. Checks before using the labels:
+- `final_price` lies inside the range (dutch) or equals `price` (fixed) for at least 95% of completed offers;
+- `expiry_date` is 20–60 calendar days after the first filing for at least 90% of offers;
+- print 50 random offers (company, dates, prices, odd-lot flag, link) into the design file for the user.
+
+**Step 3, backtest (`backtest/us_odd_lot.py`).** Traps specific to this test:
+- The entry price and the floor are compared in **actual dollars of that day**. `us_prices_daily` is
+  split-adjusted: multiply by later split ratios first. A unit test must cover an offer followed by a split.
+- E1 enters at the first regular open **after the acceptance time** of the first `SC TO-I` (a filing at
+  17:00 ET enters the next day; one at 07:00 ET enters the same day).
+- An offer is tradable only if its entry day is at least 3 trading days before the expiry known **at
+  entry** (the original one for E1, the latest announced one for E2).
+- Dutch auctions: the entry test uses `price_low`; the payoff uses `final_price`. Never the reverse.
+- A failed deal is still a trade: sell at the next open after the termination filing, with full costs.
+- Cash is out of SPY from the entry day to the payment day (last expiry + 7 trading days).
+- Returns are per deal on the money invested (shares × entry price), not on the $6,000.
+
+**Step 4, report** as in the runbook, plus: deals per year, dollars per year, the list of failed
+deals, and the mean gap by year (is the edge shrinking?). The too-good rule applies with a twist: a win
+rate above 95% is plausible here, so instead verify 10 completed deals by hand against the results
+press release (final price and that odd lots were not prorated).
+
+**What would make the conclusion wrong:** (a) counting offers without odd-lot priority, where the
+holder is scaled back and left with shares that fall after expiry; (b) using the split-adjusted price;
+(c) dropping terminated offers; (d) ignoring withholding tax, which the backtest cannot see.
