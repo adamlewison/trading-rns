@@ -137,3 +137,41 @@ the verdict is "too small to judge".
   holders only, which the design excludes, so the usable count will be lower than the launch count.
 - Not written yet: `backtest/uk_retail_offers.py`. Intraday launches (08:00–16:30) use the previous
   day's close as the last known price (the conservative reading of "Decision time").
+
+## Choose-period result (launches up to 2024-12-31, run 2026-11-16): TOO SMALL TO JUDGE
+All 1,134 texts were fetched (Investegate answered again) and labelled by Luna for £0.38: 687 launches,
+405 results, 42 other. Final period (2025 →) not looked at.
+
+**From 399 choose-period launch announcements to 50 usable offers** (100 required):
+72 state no price yet, 140 are for existing holders only, 23 repeat an earlier announcement of the same
+offer → 164 offers. Of those: 61 have no prices (company outside our universe or delisted), 27 have an
+issue price that cannot be compared with our price data (below), 18 are too small or illiquid, 6 have
+no clean last close, 2 no admission date → **50 used**.
+
+| Variant | Offers | Winners | Mean net | Median net | Excess, full allocation (t) | Excess, adverse allocation (t) | Adverse, without 2020 | Adverse, without best 5 |
+|---|---|---|---|---|---|---|---|---|
+| A-open | 50 | 60% | +5.2% | +1.4% | +4.7% (2.9) | +0.7% (1.0) | +0.3% | −0.3% |
+| A-close | 50 | 58% | +5.3% | +3.0% | +4.7% (2.5) | +0.4% (0.6) | −0.2% | −0.6% |
+| D5-open | 40 | 60% | +4.4% | +0.8% | +4.0% (2.5) | +0.7% (0.8) | +0.4% | −0.5% |
+| D5-close | 40 | 58% | +4.4% | +2.6% | +4.0% (2.0) | +0.3% (0.3) | −0.2% | −0.9% |
+
+- Excess = net return minus the FTSE All-Share over the same days. Average discount at launch 12%;
+  the share price falls about 6% the next day but stays above the issue price; average wait 11 days;
+  about a third of offers trade below the issue price at admission.
+- **The whole question is allocation.** With every application filled in full the offers made about
+  +4.7% each over the index in 11 days (t 2.5–2.9, below the 3 required). Under the adverse rule (a
+  quarter filled when the price holds more than 3% above the issue price, which was the case for about
+  two thirds of offers) it is +0.7% (t 1.0), and negative without the five best offers. The backtest
+  cannot tell which is closer to the truth: only real applications can.
+- Even if the count reached 100, the adverse-allocation result as it stands would fail the pass rule.
+- ⚠️ 61 of 164 offers have no prices, many of them companies that later failed: the result flatters.
+- **Data finding:** Yahoo's UK `close` is adjusted for later share consolidations. 19 of the 27
+  "issue price cannot be compared" offers are companies that later consolidated their shares 10–700 to 1
+  (issue price 0.5p against an adjusted close of 6.5p). Any test comparing a price stated in a document
+  with UK prices needs the consolidation history, or the last close stated in the same document.
+- Checks: the 10 best and worst offers were printed and read (prices and dates consistent); no variant
+  trips the too-good rule. No placebo was run (an event test with a fixed purchase price has none).
+
+**What would settle it:** a live record of real allocations. Apply for the minimum (often £100–250)
+in each open retail offer on PrimaryBid or through a RetailBook broker for a few months and note the
+amount received; that measures the one thing the backtest has to assume.

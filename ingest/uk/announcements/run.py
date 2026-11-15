@@ -137,7 +137,7 @@ def index_daily(start: date, end: date, refresh: bool) -> None:
 
 
 def fetch_bodies(limit: int | None, randomise: bool, tickers: list[str] | None = None,
-                 headline_re: str | None = None) -> None:
+                 headline_re: str | None = None, month_last: bool = False) -> None:
     cfg = uk_cfg()["announcements"]
     src = get_source()
     where = ["b.ann_id IS NULL"]
@@ -152,7 +152,12 @@ def fetch_bodies(limit: int | None, randomise: bool, tickers: list[str] | None =
     if tickers:
         where.append("i.tidm IN (" + ",".join(f"'{t}'" for t in tickers) + ")")
     order = "random()" if randomise else "i.published_uk DESC"
-    q = f"""SELECT i.ann_id, i.url FROM ann_index i LEFT JOIN ann_bodies b USING (ann_id)
+    src_tbl = "ann_index"
+    if month_last and headline_re:      # only the last matching announcement of each company-month (e.g. NAVs)
+        src_tbl = ("(SELECT * FROM ann_index WHERE regexp_matches(lower(headline), '" + headline_re.replace("'", "''")
+                   + "') QUALIFY row_number() OVER (PARTITION BY tidm, date_trunc('month', published_uk)"
+                     " ORDER BY published_uk DESC) = 1)")
+    q = f"""SELECT i.ann_id, i.url FROM {src_tbl} i LEFT JOIN ann_bodies b USING (ann_id)
             WHERE {' AND '.join(where)} ORDER BY {order}""" + (f" LIMIT {int(limit)}" if limit else "")
     with session() as con:
         if randomise:
@@ -260,6 +265,7 @@ if __name__ == "__main__":
     ap.add_argument("--limit", type=int)
     ap.add_argument("--sample", type=int, help="random sample of N universe tickers (company mode)")
     ap.add_argument("--random", action="store_true", help="bodies: random order")
+    ap.add_argument("--month-last", action="store_true", help="bodies with --headline-re: only the last match per company-month")
     ap.add_argument("--headline-re", help="bodies: fetch every announcement whose lower-cased headline matches")
     ap.add_argument("--refresh", action="store_true")
     ap.add_argument("--start", type=date.fromisoformat)
@@ -273,7 +279,7 @@ if __name__ == "__main__":
             s, e = date_range(load_config())
             index_daily(a.start or s, a.end or e, a.refresh)
     elif a.cmd == "bodies":
-        fetch_bodies(a.limit, a.random, a.tickers, a.headline_re)
+        fetch_bodies(a.limit, a.random, a.tickers, a.headline_re, a.month_last)
     elif a.cmd == "reclassify":
         reclassify()
     elif a.cmd == "build":

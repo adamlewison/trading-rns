@@ -59,10 +59,8 @@ then paper trading, then small size.
 - **The user's account:** about $6,000, around $150 per trade, Trading 212 (IBKR opened 2026-11-15), holds up to ~20 days.
 - **The user's preference (2026-11-15):** short trades (hours to days) whose gains are reinvested (lesson 17).
 - **State 2026-11-16** (plans in section 7, procedure in `backtest/RUNBOOK.md`): tax-loss rebound and crypto trend
-  have failed (section 6). **UK retail offers:** the user agreed to a choose period up to end-2024; 677 announcement
-  texts still need fetching on the droplet, but **Investegate timed out on every page on 2026-11-15** (from the droplet
-  and from a cloud session; robots.txt answered), so the fetch was stopped: retry later, never from another machine to
-  get round it. Label extraction is written and smoke-tested (`classify/uk_retail_offers.py`); the backtest is not written. **Prediction markets:**
+  have failed (section 6). **UK retail offers:** choose period run (to end-2024): too small to judge and wholly
+  dependent on allocation (section 7); texts and labels are done (£0.38). **Prediction markets:**
   the Kalshi listing runs on the droplet (unit `kalshi-list`); next steps in `DESIGN_PM_FAVOURITES.md` ("State").
   **Odd-lot tenders:** public sources say a UK holder has 15% of gross proceeds withheld unless the broker accepts a
   Section 302 certificate; whether IBKR does is unknown and decides the track (the user is asking IBKR).
@@ -179,7 +177,7 @@ Each has a full plan written 2026-11-15 **before any data or result was seen**. 
 | # | Strategy | Plan | Needs | Why here |
 |---|---|---|---|---|
 | 1 | **Odd-lot tender offers** (US): buy ≤ 99 shares below a company's own tender price and tender them | `DESIGN_ODD_LOT.md` | EDGAR SC TO-I pull; Luna < $5. **Blocked on one question to IBKR:** does it accept a Section 302 certificate so that tender proceeds are not withheld at 15%? (research in the design) | A prize too small for funds; capped, so it adds income but does not compound |
-| 2 | **UK retail offers** (PrimaryBid / RetailBook): placing stock at the discount, sold on admission | `DESIGN_UK_RETAIL_OFFERS.md` | 677 texts to fetch once Investegate answers again, then Luna < £2; a second broker to trade it | Days to weeks, 5–10% discount; choose period now up to end-2024 (too few offers before 2022); judged under an adverse scale-back assumption. ⚠️ survivorship flatters |
+| 2 | **UK retail offers** (PrimaryBid / RetailBook): placing stock at the discount, sold on admission | `DESIGN_UK_RETAIL_OFFERS.md` | a live record of real allocations (apply for the minimum in each offer); final period 2025 → unused | **Too small to judge** (50 usable offers to end-2024; 100 required). Filled in full: +4.7% over the index per offer in 11 days (t 2.9); if popular offers are scaled back to a quarter: +0.7% (t 1.0). Allocation decides it and can only be measured live. ⚠️ survivorship flatters |
 | 3 | **Prediction-market near-certainties** (Kalshi history): buy contracts at 90–98c days before they settle | `DESIGN_PM_FAVOURITES.md`; ingest and backtest written, not run | the droplet's listing to finish, then 1–2 h of candles | Closest real thing to "1–3% in days", stakes compound. ⚠️ Kalshi and Polymarket are closed to UK residents: a pass is evidence only, then Betfair data is needed |
 | 5 | **UK investment trust discounts**: buy equity trusts when the discount is wide vs their own 12 months | `DESIGN_UK_TRUST_DISCOUNTS.md` | trust universe, prices, ~50,000 NAV pages (7 h) | Clearest reason to beat an index, but holds of months (not the user's preference) and the most data work |
 | 7 | **US news drift** (deals, CEO exits, profit warnings) | none | Luna ~$140 | Only with a reason to expect a bigger effect than earnings |
@@ -249,6 +247,8 @@ small caps.
 - Announcements (Investegate): UK wall-clock time → UTC; pre-open = before 08:00. `headline_category`
   is a rough regex label. Admin notices kept separately without bodies; "Director/PDMR Shareholding"
   is **not** admin. Replacements and non-regulatory items kept and flagged.
+- ⚠️ Yahoo's UK `close` is adjusted for later share consolidations (common on AIM, 10–700 to 1): a price stated in
+  an announcement cannot be compared with it without the consolidation history or the close stated in the same text.
 - SETS/SETSqx from LSE's official files, current only (today's service is a proxy for the past).
 
 ## 9. Infrastructure, layout, commands
@@ -311,6 +311,7 @@ uv run python -W ignore -m features.us_earnings build && uv run python -W ignore
 uv run python -W ignore -m backtest.us_account choose --hold 20          # final runs need --final, once
 uv run python -W ignore -m ingest.uk.announcements.run bodies --headline-re 'retail offer|primarybid|retailbook'  # droplet only
 uv run python -W ignore -m classify.uk_retail_offers run --max-gbp 3|report
+uv run python -W ignore -m backtest.uk_retail_offers choose              # final needs --final, once
 uv run python -W ignore -m backtest.crypto_trend data|choose             # final needs --final, once
 uv run python -W ignore -m backtest.us_tax_loss choose                  # needs data/us_min/*.parquet (docstring)
 uv run python -W ignore -m ingest.pm.kalshi series|markets|candles|status|upload|download  # Kalshi history (resumable, ~1–2 req/s)
