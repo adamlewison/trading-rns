@@ -123,3 +123,17 @@ the verdict is "too small to judge".
   announcement if it gives one, else the expected date in the launch announcement.
 - Pass rule unchanged (≥ 100 offers, adverse allocation, t ≥ 3 by launch week); "still positive with 2020
   removed" stays.
+
+## State (2026-11-16)
+- 1,134 announcements match the new headline pattern (362 are results); 457 have text, 677 do not.
+- The fetch on the droplet (unit `retail-bodies`, run from `/opt/trading-rns-pm` with `data/uk.duckdb` and
+  `data/raw/uk` linked to the UK checkout) was stopped: every Investegate page timed out, from the droplet
+  and from a cloud session, while robots.txt answered. Retry later with the same command; if pages still
+  time out, stop and report. After a successful fetch the UK backup loop carries the texts to B2
+  (`core.backup pull --profile uk --force --skip-raw` in a cloud session).
+- `classify/uk_retail_offers.py` (Luna, facts only) is written and was tried on five stored
+  announcements: it returned kind, price in pence, platform, close time, existing-holders-only,
+  general-meeting condition and admission date correctly formed. Many WRAP offers are for existing
+  holders only, which the design excludes, so the usable count will be lower than the launch count.
+- Not written yet: `backtest/uk_retail_offers.py`. Intraday launches (08:00–16:30) use the previous
+  day's close as the last known price (the conservative reading of "Decision time").
