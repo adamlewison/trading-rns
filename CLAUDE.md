@@ -58,9 +58,8 @@ then paper trading, then small size.
   B2 `trading-rns/paper/status.md`. Judge after ≥ 12 months; no picking a winner early.
 - **The user's account:** about $6,000, around $150 per trade, Trading 212 (IBKR opened 2026-11-15), holds up to ~20 days.
 - **The user's preference (2026-11-15):** short trades (hours to days) whose gains are reinvested (lesson 17).
-- **Handover (2026-11-15):** the user wants a cheaper model to run the tests. Six plans are written and nothing
-  has been run (section 7); procedure in `backtest/RUNBOOK.md`. A Kalshi pull was started and stopped; no
-  outcome data was looked at. Waiting on: IBKR's answers for the odd-lot test; the user's go-ahead per test.
+- **Handover (2026-11-15):** plans for the remaining ideas are in section 7, procedure in `backtest/RUNBOOK.md`.
+  Run so far: tax-loss rebound (failed, section 6). Waiting on IBKR's answers for the odd-lot test.
 - Droplet runner (`trading-rns-agent`) installed 2026-11-12: agents reach the droplet themselves (~6s a command).
 - US Luna leftovers: 150,457 of 150,518 labelled; 13 small batches still at OpenAI (`luna-run` on the droplet). When done: `classify.labels build`, then `features.us_earnings_labels build`.
 
@@ -158,6 +157,8 @@ then paper trading, then small size.
 | US large-company factors (value, quality, momentum, combined), top 30 of the 500 largest, monthly, $6k | **Failed.** 2013–21: quality 17.3%/yr vs SPY 16.2% (4 of 9 years; 5 required), others lagged. Final test (user override) on quality: +42% vs SPY +64% in 2022 → now, while the three that lagged earlier beat SPY there: each variant won one period and lost the other. Also measured survivorship without buying data: 29% of large filers in 2013 have no price (3% in 2026) | `backtest/DESIGN_FACTORS.md` |
 | UK news drift **with Luna labels** (55,654 announcements labelled, £14.11): model on baseline + label features, 20-day hold | **Failed the final test.** 2019–21 just passed (+£193; without labels −£638). 2022 → now: account +£383 vs FTSE All-Share fund +£2,241; it beat the AIM/SmallCap index by +£1,486 (3 of 5 years), but small caps lagged so badly that beating them wasn't enough | `backtest/DESIGN_UK_NEWS.md` |
 
+| US year-end tax-loss rebound: the 30 worst small/mid caps of the year, bought 5 trading days before year-end, sold on January's 10th or 20th trading day | **Failed on Decembers 2012–2020** (final years unused): beat SPY in 6 of 9 years (7 required); mean +2.4% to +4.2% vs SPY but ≈0% without the best year, and January 2016 lost 23%. No pick ever stopped trading: the failures are missing from the data | `backtest/DESIGN_TAX_LOSS.md` |
+
 Every strategy whose final test ran has spent its final years: further work on them can only be judged live (paper trading)
 or with delisted prices. Open lead: the insider model's small-stock picks (worth a paper trial).
 
@@ -171,13 +172,11 @@ Each has a full plan written 2026-11-15 **before any data or result was seen**. 
 | 1 | **Odd-lot tender offers** (US): buy ≤ 99 shares below a company's own tender price and tender them | `DESIGN_ODD_LOT.md` | EDGAR SC TO-I pull; Luna < $5. **Blocked until IBKR answers** (withholding tax for UK holders, odd-lot elections, fee, cut-off) | A prize too small for funds; capped, so it adds income but does not compound |
 | 2 | **UK retail offers** (PrimaryBid / RetailBook): placing stock at the discount, sold on admission | `DESIGN_UK_RETAIL_OFFERS.md` | have RNS; Luna < £2; a second broker to trade it | Days to weeks, 5–10% discount; judged under an adverse scale-back assumption. ⚠️ survivorship flatters |
 | 3 | **Prediction-market near-certainties** (Kalshi history): buy contracts at 90–98c days before they settle | `DESIGN_PM_FAVOURITES.md`; ingest `ingest/pm/kalshi.py` written, backtest not | 2–3 h of polite downloading | Closest real thing to "1–3% in days", stakes compound. ⚠️ Kalshi and Polymarket are closed to UK residents: a pass is evidence only, then Betfair data is needed |
-| 4 | **Year-end tax-loss rebound** (US): the year's worst small/mid caps, late December to mid January | `DESIGN_TAX_LOSS.md` | nothing | Forced sellers; 14 yearly observations only, ⚠️ survivorship flatters. **Paper baskets must be recorded about 23 December 2026 whatever the backtest says** |
 | 5 | **UK investment trust discounts**: buy equity trusts when the discount is wide vs their own 12 months | `DESIGN_UK_TRUST_DISCOUNTS.md` | trust universe, prices, ~50,000 NAV pages (7 h) | Clearest reason to beat an index, but holds of months (not the user's preference) and the most data work |
 | 6 | **Crypto trend** (BTC, ETH; in when the trend is up, sized by volatility) | `DESIGN_CRYPTO_TREND.md` | yfinance only | Short trades, cheap to test; low prior (mostly crypto beta) |
 | 7 | **US news drift** (deals, CEO exits, profit warnings) | none | Luna ~$140 | Only with a reason to expect a bigger effect than earnings |
 
-**Run order for a cheaper model:** 4 (simplest, data in hand, and the December paper step is time-critical),
-6, 3, 2, then 1 once IBKR has answered, then 5. One at a time; stop and report after each choose run.
+**Run order for a cheaper model:** 6, 3, 2, then 1 once IBKR has answered, then 5. One at a time; stop and report after each choose run.
 Not planned: **UK possible offers** (Rule 2.4, hold to the 28-day deadline): acquired targets have no
 prices, so it needs delisted data first. Sparse strategies assume idle cash sits in the index fund.
 
@@ -302,12 +301,15 @@ uv run python -W ignore -m classify.openai_full run --max-gbp 55|status  # Luna 
 uv run python -W ignore -m classify.labels build|report
 uv run python -W ignore -m features.us_earnings build && uv run python -W ignore -m features.us_earnings_labels build
 uv run python -W ignore -m backtest.us_account choose --hold 20          # final runs need --final, once
+uv run python -W ignore -m backtest.us_tax_loss choose                  # needs data/us_min/*.parquet (docstring)
 uv run python -W ignore -m ingest.pm.kalshi series|markets|candles|status  # Kalshi history (resumable, ≤5 req/s)
 ```
 Backups never lose data: local files are deleted only after a verified upload, and a push never
 replaces a table snapshot with an empty one. Only the US loop prunes cached SEC pages.
 
 ## 10. Open items
+- **Tax-loss paper baskets:** the design asks for the four baskets to be recorded about 23 December 2026
+  (survivorship-free check) even though the backtest failed; not set up yet.
 - **UK market makers:** the user downloads LSE's "Registered Market Makers by Security" file by hand,
   then `import-mm` (above).
 - **Delisted prices (survivorship fix), nothing bought.** Rough prices Nov 2026, check before buying:

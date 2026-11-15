@@ -65,3 +65,30 @@ the factor portfolios; nothing is traded.
   like $40 when it was $2). Use the actual price on S.
 - Trap: counting 30 stocks in one December as 30 independent results. They are one bet.
 - Trap: comparing with SPY only. The comparison with IWM is what separates this from "small caps went up".
+
+## Changes (2026-11-15, made before any result was seen)
+- The price table has no security type, so funds and exchange-traded products are removed by company
+  name (`NOT_COMMON` in `backtest/us_tax_loss.py`); realty and bank "trusts" are lost with them.
+- "The 20th trading day of January" is counted from January's first trading day and runs into February
+  when January has fewer than 20 (January 2021 has 19).
+
+## Choose-years result (Decembers 2012–2020, run 2026-11-15): FAILED the pass rule
+Needed: beat SPY after costs in at least 7 of 9 years. Best was 6 of 9. Final years (2021–2025) unused.
+
+| Variant | Years beating SPY | Mean net | Mean vs SPY | Median vs SPY | Mean vs IWM | $ vs SPY (9 trades) | Mean vs SPY without best year |
+|---|---|---|---|---|---|---|---|
+| W30-10 | 6 of 9 | +3.4% | +2.4% | +3.1% | +2.4% | +$990 | +0.7% (without 2018) |
+| W30-20 | 5 of 9 | +5.5% | +3.7% | +1.6% | +4.1% | +$1,503 | −0.4% (without 2020) |
+| X80-10 | 6 of 9 | +3.6% | +2.7% | +3.1% | +2.6% | +$1,074 | +0.8% (without 2020) |
+| X80-20 | 5 of 9 | +6.0% | +4.2% | +1.6% | +4.6% | +$1,696 | −0.2% (without 2020) |
+
+- By year, W30-10 vs SPY: 2012 +1.8%, 2013 +11.0%, 2014 −5.8%, 2015 −23.1%, 2016 +3.1%, 2017 +6.3%,
+  2018 +16.5%, 2019 −3.9%, 2020 +16.2%. The bounce exists on average but one bad January (2016: −23%)
+  costs as much as the two best years earn; this is a volatile bet on beaten-down small stocks, not a
+  reliable rebound.
+- Checks: the whole filtered universe returned about what IWM did each year (benchmark check passes);
+  270 trades per variant, none dropped for a missing entry price. Costs 0.8–1.2% a round trip.
+- ⚠️ Not one of the 270 picks "stopped trading" before the exit. Among each year's 30 worst stocks that
+  is implausible: the failures are missing from the data (survivorship), so even these numbers flatter.
+- Averages are carried by 2018 and 2020 (rebounds after sell-offs, lessons 10 and 14).
+- The December 2026 paper baskets asked for above are **not yet set up** (open item in `CLAUDE.md`).
