@@ -5,7 +5,8 @@ fund.** Not tied to any market, data source or idea. When a track fails, record 
 tracks. We don't stop until one passes.
 
 ## How to use this doc (every agent, Claude or not)
-This is the **only** project doc (`AGENTS.md` is a link to it). Read it fully before starting work.
+This is the project's master doc (`AGENTS.md` is a link to it). Read it fully before starting work; before
+running any test also read `backtest/RUNBOOK.md` (how to test) and the strategy's `backtest/DESIGN_*.md`.
 It is the project's memory: what isn't written here is lost between sessions.
 
 **Update it as you work, not at the end.** Whenever you learn or decide something, write it here
@@ -55,12 +56,11 @@ then paper trading, then small size.
   (V, Q, M, QVM; frozen rules in `backtest/DESIGN_FACTORS.md`), droplet timer `trading-rns-paper` weekdays
   22:30 UTC, first rebalance **2026-12-01**. Results: `uv run python -W ignore -m paper.factors status`, or
   B2 `trading-rns/paper/status.md`. Judge after ≥ 12 months; no picking a winner early.
-- **Odd-lot tender offers (idea 1) chosen 2026-11-15;** the user has opened an IBKR account. Design written
-  (`backtest/DESIGN_ODD_LOT.md`), nothing pulled or run. **Waiting on the user:** IBKR's answers on withholding
-  tax for non-US holders, odd-lot elections, fees and cut-off (phase 0 of the design), then the go-ahead for data.
 - **The user's account:** about $6,000, around $150 per trade, Trading 212 (IBKR opened 2026-11-15), holds up to ~20 days.
-- **The user's preference (2026-11-15):** short trades (hours to days) whose gains are reinvested so the account
-  compounds fast. Section 7 is ordered with that in mind (lesson 17); waiting for the user to pick the next test.
+- **The user's preference (2026-11-15):** short trades (hours to days) whose gains are reinvested (lesson 17).
+- **Handover (2026-11-15):** the user wants a cheaper model to run the tests. Six plans are written and nothing
+  has been run (section 7); procedure in `backtest/RUNBOOK.md`. A Kalshi pull was started and stopped; no
+  outcome data was looked at. Waiting on: IBKR's answers for the odd-lot test; the user's go-ahead per test.
 - Droplet runner (`trading-rns-agent`) installed 2026-11-12: agents reach the droplet themselves (~6s a command).
 - US Luna leftovers: 150,457 of 150,518 labelled; 13 small batches still at OpenAI (`luna-run` on the droplet). When done: `classify.labels build`, then `features.us_earnings_labels build`.
 
@@ -134,6 +134,10 @@ then paper trading, then small size.
     depend on the market regime (2020 rebound) and are the most flattered by missing failed companies.
 
 ## 5. Markets compared
+- **Prediction markets:** Kalshi and Polymarket are closed to UK residents (no Gambling Commission licence;
+  checked 2026-11-15). UK-legal venues are Betfair, Smarkets and Matchbook. Kalshi's public data API needs no
+  account but answers 429 above ~5 requests a second; Betfair's free price files gave 403 here; Smarkets'
+  public API lists no settled markets.
 - **US** (SEC 8-Ks, Trading 212 or IBKR): free, official, timestamped filings; no stamp duty;
   tight spreads on liquid stocks; crowded with professionals.
 - **UK** (RNS on AIM / small caps): possibly bigger underreaction, but 0.5% stamp duty on
@@ -159,19 +163,23 @@ or with delisted prices. Open lead: the insider model's small-stock picks (worth
 
 ## 7. What's next, in priority order
 
-| # | Strategy | Data | LLM cost | Why here |
-|---|---|---|---|---|
-| 1 | **Odd-lot tender offers** (US): issuer self-tenders where holders of < 100 shares aren't scaled back; buy ≤ 99 shares below the tender price, tender them | EDGAR SC TO-I filings (not yet pulled); issuers survive, so prices exist | ~$5 | An edge capped at ~$3–10k a deal, so funds can't take it. Design: `backtest/DESIGN_ODD_LOT.md`. ⚠️ Non-US holders may have 15–30% of gross proceeds withheld: check with IBKR first |
-| 2 | **UK investment trust discounts**: buy equity trusts when the discount to NAV is wide vs their own history (or a wind-down / tender / continuation vote is due), sell when it narrows | NAVs are in RNS; trusts aren't in our universe yet | none | Index-like assets bought below value; wound-up trusts paid out near NAV, so missing delisted prices hurt rather than flatter. Longer holds (months) |
-| 3 | **UK retail offers** (PrimaryBid / RetailBook): take placing stock at the discount, sell on admission | have it (RNS + labels) | none | Discount normally reserved for institutions; no stamp duty on new shares. Watch for scale-back in the good deals; needs a second broker |
-| 4 | **UK possible offers**: buy targets after a Rule 2.4 announcement, hold to the 28-day put-up-or-shut-up deadline | RNS has them; ⚠️ acquired targets have no prices, so paper/live only or buy delisted prices | small | Known deadline inside the 20-day hold; pays if firm bids and raised bids are under-priced |
-| 5 | **Year-end tax-loss rebound**: buy the year's worst small caps / widest-discount trusts in late December, sell in January | have it | none | Forced, non-economic sellers; one trade a year, so few independent tests |
-| 6 | **Prediction markets** (LLM forecasts vs prices; near-certain contracts) | new (Kalshi / Polymarket / Betfair APIs) | small | Thin markets, weak competition, reading is the edge; contracts at 95–99c resolving in days are the closest real thing to "1–3% in days" (a wrong one loses the whole stake, so many small independent bets). Free price history allows a backtest before any account. Only where the user may legally trade |
-| 7 | **Crypto trend** (spot majors, daily bars, sized by volatility; in cash when the trend is down) | free exchange history from 2017 | none | Fits short holds and low costs (~0.1–0.2%), open 24/7; documented momentum, but decayed and mostly crypto beta. Low prior; judge vs holding BTC and vs the index |
-| 8 | **US news drift** (deals, CEO exits, profit warnings) | have it (421,832 filings) | ~$140 | Only with a reason to expect a bigger effect than earnings |
+Each has a full plan written 2026-11-15 **before any data or result was seen**. Whoever runs one follows
+`backtest/RUNBOOK.md` (procedure, look-ahead checklist, checks before believing a result, allowed verdicts).
 
-Ideas 1–6 were proposed 2026-11-14 after a step back (lesson 16): none is tested, each needs its design file
-first. Sparse strategies assume idle cash sits in the index fund and are judged per trade against it.
+| # | Strategy | Plan | Needs | Why here |
+|---|---|---|---|---|
+| 1 | **Odd-lot tender offers** (US): buy ≤ 99 shares below a company's own tender price and tender them | `DESIGN_ODD_LOT.md` | EDGAR SC TO-I pull; Luna < $5. **Blocked until IBKR answers** (withholding tax for UK holders, odd-lot elections, fee, cut-off) | A prize too small for funds; capped, so it adds income but does not compound |
+| 2 | **UK retail offers** (PrimaryBid / RetailBook): placing stock at the discount, sold on admission | `DESIGN_UK_RETAIL_OFFERS.md` | have RNS; Luna < £2; a second broker to trade it | Days to weeks, 5–10% discount; judged under an adverse scale-back assumption. ⚠️ survivorship flatters |
+| 3 | **Prediction-market near-certainties** (Kalshi history): buy contracts at 90–98c days before they settle | `DESIGN_PM_FAVOURITES.md`; ingest `ingest/pm/kalshi.py` written, backtest not | 2–3 h of polite downloading | Closest real thing to "1–3% in days", stakes compound. ⚠️ Kalshi and Polymarket are closed to UK residents: a pass is evidence only, then Betfair data is needed |
+| 4 | **Year-end tax-loss rebound** (US): the year's worst small/mid caps, late December to mid January | `DESIGN_TAX_LOSS.md` | nothing | Forced sellers; 14 yearly observations only, ⚠️ survivorship flatters. **Paper baskets must be recorded about 23 December 2026 whatever the backtest says** |
+| 5 | **UK investment trust discounts**: buy equity trusts when the discount is wide vs their own 12 months | `DESIGN_UK_TRUST_DISCOUNTS.md` | trust universe, prices, ~50,000 NAV pages (7 h) | Clearest reason to beat an index, but holds of months (not the user's preference) and the most data work |
+| 6 | **Crypto trend** (BTC, ETH; in when the trend is up, sized by volatility) | `DESIGN_CRYPTO_TREND.md` | yfinance only | Short trades, cheap to test; low prior (mostly crypto beta) |
+| 7 | **US news drift** (deals, CEO exits, profit warnings) | none | Luna ~$140 | Only with a reason to expect a bigger effect than earnings |
+
+**Run order for a cheaper model:** 4 (simplest, data in hand, and the December paper step is time-critical),
+6, 3, 2, then 1 once IBKR has answered, then 5. One at a time; stop and report after each choose run.
+Not planned: **UK possible offers** (Rule 2.4, hold to the 28-day deadline): acquired targets have no
+prices, so it needs delisted data first. Sparse strategies assume idle cash sits in the index fund.
 
 **Exit ideas** (tools applied per strategy, fixed before each test):
 - **A. Targets scaled to each stock's normal move (default):** target and stop as multiples of the
@@ -294,6 +302,7 @@ uv run python -W ignore -m classify.openai_full run --max-gbp 55|status  # Luna 
 uv run python -W ignore -m classify.labels build|report
 uv run python -W ignore -m features.us_earnings build && uv run python -W ignore -m features.us_earnings_labels build
 uv run python -W ignore -m backtest.us_account choose --hold 20          # final runs need --final, once
+uv run python -W ignore -m ingest.pm.kalshi series|markets|candles|status  # Kalshi history (resumable, ≤5 req/s)
 ```
 Backups never lose data: local files are deleted only after a verified upload, and a push never
 replaces a table snapshot with an empty one. Only the US loop prunes cached SEC pages.
