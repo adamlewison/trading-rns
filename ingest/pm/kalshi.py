@@ -4,6 +4,7 @@
     uv run python -W ignore -m ingest.pm.kalshi markets      # every settled market of every series
     uv run python -W ignore -m ingest.pm.kalshi candles      # last 8 days of hourly candles, eligible markets
     uv run python -W ignore -m ingest.pm.kalshi status
+    uv run python -W ignore -m ingest.pm.kalshi upload|download   # B2 trading-rns/pm/v1/kalshi/
 
 Every step is resumable: finished series / tickers are recorded and skipped. Polite: one shared rate
 limit, back off on 429/5xx, stop on 403. Files under data/pm/kalshi/ (see backtest/DESIGN_PM_FAVOURITES.md).
@@ -107,8 +108,38 @@ def cmd_series(cl: Client) -> None:
     print(f"{len(rows)} series")
 
 
-def _series_markets(cl: Client, series: str) -> list[dict]:
-    out: dict[str, dict] = {}
+class Shards:
+    """Append-only gzip JSON-lines writer that starts a new file every `rotate` rows (small files
+    upload easily from the 1GB droplet). Rows are flushed before anything is marked done."""
+
+    def __init__(self, folder: Path, prefix: str, rotate: int = 200_000):
+        folder.mkdir(parents=True, exist_ok=True)
+        self.folder, self.prefix, self.rotate = folder, prefix, rotate
+        self.lock = threading.Lock()
+        self.rows = 0
+        self.f = None
+
+    def write(self, rows: list[dict]) -> None:
+        with self.lock:
+            if self.f is None or self.rows >= self.rotate:
+                self.close()
+                self.f = gzip.open(self.folder / f"{self.prefix}-{time.time_ns()}.jsonl.gz", "at")
+                self.rows = 0
+            for r in rows:
+                self.f.write(json.dumps(r) + "\n")
+            self.f.flush()
+            self.rows += len(rows)
+
+    def close(self) -> None:
+        if self.f is not None:
+            self.f.close()
+            self.f = None
+
+
+def _series_markets(cl: Client, series: str, shards: Shards) -> int:
+    """Streams each page to disk (a series can hold hundreds of thousands of markets). A market can
+    appear in both tiers, or twice after a restart: readers de-duplicate by ticker."""
+    n = 0
     for path, extra in (("/historical/markets", {}), ("/markets", {"status": "settled"})):
         cursor = None
         while True:
@@ -116,17 +147,21 @@ def _series_markets(cl: Client, series: str) -> list[dict]:
             if cursor:
                 p["cursor"] = cursor
             d = cl.get(path, p) or {}
+            rows = []
             for m in d.get("markets", []):
                 if m.get("mve_collection_ticker") or m["ticker"].startswith("KXMVE"):
                     continue
                 row = {k: m.get(k) for k in KEEP}
                 row["series"] = series
                 row["title"] = (row.get("title") or "")[:100]
-                out[m["ticker"]] = row
+                rows.append(row)
+            if rows:
+                shards.write(rows)
+                n += len(rows)
             cursor = d.get("cursor")
             if not cursor or len(d.get("markets", [])) < 1000:
                 break
-    return list(out.values())
+    return n
 
 
 def cmd_markets(cl: Client) -> None:
@@ -136,23 +171,18 @@ def cmd_markets(cl: Client) -> None:
     done = _done(done_path)
     todo = [s for s in series if s not in done]
     print(f"{len(todo)} of {len(series)} series to list", flush=True)
-    mdir = ROOT / "markets"
-    mdir.mkdir(exist_ok=True)
+    shards = Shards(ROOT / "markets", "m")
     wlock = threading.Lock()
-    shard = gzip.open(mdir / f"m-{int(time.time())}.jsonl.gz", "at")
     count = [0, 0, time.time()]
 
     def work(s: str) -> None:
-        rows = _series_markets(cl, s)
+        n = _series_markets(cl, s, shards)
         with wlock:
-            for r in rows:
-                shard.write(json.dumps(r) + "\n")
             with done_path.open("a") as f:
                 f.write(s + "\n")
-            shard.flush()                      # rows are on disk before the series is marked done
             count[0] += 1
-            count[1] += len(rows)
-            if time.time() - count[2] > 60:
+            count[1] += n
+            if time.time() - count[2] > 300:
                 count[2] = time.time()
                 print(f"{count[0]} series, {count[1]} markets, {cl.n} requests, {cl.n429} x 429, rate {cl.rate:.1f}/s", flush=True)
 
@@ -160,8 +190,44 @@ def cmd_markets(cl: Client) -> None:
         with ThreadPoolExecutor(4) as ex:
             list(ex.map(work, todo))
     finally:
-        shard.close()
+        shards.close()
     print(f"done: {count[0]} series, {count[1]} markets")
+
+
+B2_PREFIX = "trading-rns/pm/v1/kalshi"
+
+
+def _files() -> list[Path]:
+    return sorted(p for p in ROOT.rglob("*") if p.is_file())
+
+
+def cmd_upload() -> None:
+    """Copy data/pm/kalshi/ to B2 (skips files already there with the same size)."""
+    from core.backup import get_store
+    st = get_store()
+    have = set(st.list(B2_PREFIX + "/"))
+    n = 0
+    for p in _files():
+        name = f"{B2_PREFIX}/{p.relative_to(ROOT).as_posix()}"
+        if name in have and p.suffix == ".gz":         # shards never change once closed
+            continue
+        st.put(name, p.read_bytes())
+        n += 1
+    print(f"uploaded {n} files to {B2_PREFIX}/")
+
+
+def cmd_download() -> None:
+    from core.backup import get_store
+    st = get_store()
+    n = 0
+    for name in st.list(B2_PREFIX + "/"):
+        p = ROOT / name[len(B2_PREFIX) + 1:]
+        if p.exists() and p.suffix == ".gz":
+            continue
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(st.get(name))
+        n += 1
+    print(f"downloaded {n} files into {ROOT}/")
 
 
 def load_markets():
@@ -207,10 +273,8 @@ def cmd_candles(cl: Client) -> None:
     done = _done(done_path)
     todo = batches([r for r in rows if r[0] not in done])
     print(f"{sum(map(len, todo))} of {len(rows)} eligible markets need candles ({len(todo)} requests)", flush=True)
-    cdir = ROOT / "candles"
-    cdir.mkdir(exist_ok=True)
+    shards = Shards(ROOT / "candles", "c", rotate=1_000_000)
     wlock = threading.Lock()
-    shard = gzip.open(cdir / f"c-{int(time.time())}.jsonl.gz", "at")
     count = [0, 0, time.time()]
 
     def num(d: dict, k: str):
@@ -236,10 +300,8 @@ def cmd_candles(cl: Client) -> None:
                             "ask_o": num(a, "open"), "ask_c": num(a, "close"),
                             "bid_o": num(b, "open"), "bid_c": num(b, "close"),
                             "last": num(p, "close"), "vol": float(c.get("volume_fp", c.get("volume", 0)) or 0)})
+        shards.write(out)                       # rows are on disk before the markets are marked done
         with wlock:
-            for o in out:
-                shard.write(json.dumps(o) + "\n")
-            shard.flush()                      # rows are on disk before the markets are marked done
             with done_path.open("a") as f:
                 f.write("".join(t + "\n" for t in ends))
             count[0] += len(ends)
@@ -252,7 +314,7 @@ def cmd_candles(cl: Client) -> None:
         with ThreadPoolExecutor(4) as ex:
             list(ex.map(work, todo))
     finally:
-        shard.close()
+        shards.close()
     print(f"done: {count[0]} markets, {count[1]} candles")
 
 
@@ -266,8 +328,8 @@ def cmd_status() -> None:
 
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "status"
-    if cmd == "status":
-        cmd_status()
+    if cmd in ("status", "upload", "download"):
+        {"status": cmd_status, "upload": cmd_upload, "download": cmd_download}[cmd]()
     else:
         {"series": cmd_series, "markets": cmd_markets, "candles": cmd_candles}[cmd](Client())
         print("finished", datetime.now(timezone.utc).isoformat(timespec="seconds"))
