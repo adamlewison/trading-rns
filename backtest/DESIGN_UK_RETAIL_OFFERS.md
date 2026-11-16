@@ -225,3 +225,13 @@ settle this: only a record of real allocations can.
   money made against the same money in the index. Skipping offers by feel breaks the test.
 - ⚠️ Offers often close within hours; the platforms' own alerts are the prompt to apply. The droplet's
   record is for measuring, not for alerting.
+
+## Practical facts for the live trial (from the labelled launches open to new investors, checked 2026-11-16)
+- **PrimaryBid no longer appears:** 20–28 offers a year in 2022–2024, none in 2025–2026. Current
+  platforms: Winterflood's WRAP (34 in 2025, 36 in 2026), RetailBook (23, 30), BookBuild (3, 8).
+- About 7 offers a month open to new investors. Launch time: 07:00–08:00 (57%) or 16:30–18:30 (43%).
+- Time open: median 3 days; a quarter close within 24 hours, 14% within 6 hours; brokers may close earlier.
+- Minimum application: £100 (most common) or £250; a third depend on a general meeting.
+- Applications go through a participating broker (announcements: "contact your broker"; Hargreaves
+  Lansdown is named publicly for WRAP). Which brokers carry RetailBook and BookBuild offers is not
+  published in one place: the user must confirm with their broker. IBKR and Trading 212 do not take part.
