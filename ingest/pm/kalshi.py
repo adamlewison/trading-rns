@@ -20,6 +20,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import quote
 
 import httpx
 
@@ -70,7 +71,7 @@ class Client:
                     if self.ok_run >= 100:
                         self.ok_run, self.rate = 0, min(RATE_PER_S, self.rate * 1.25)
                 return r.json()
-            if r.status_code == 404:
+            if r.status_code in (400, 404):         # unknown or malformed for this endpoint: no data, not a block
                 return None
             if r.status_code == 403:
                 raise Blocked(f"403 for {path}: stopping, not evading")
@@ -312,7 +313,7 @@ def cmd_candles(cl: Client, choose_only: bool = False) -> None:
     count = [0, 0, time.time()]
 
     def single(ticker: str, end: float) -> list[dict]:
-        d = cl.get(f"/historical/markets/{ticker}/candlesticks",
+        d = cl.get(f"/historical/markets/{quote(ticker, safe='')}/candlesticks",
                    {"start_ts": int(end - WINDOW_DAYS * 86400), "end_ts": int(end + 3600), "period_interval": 60}) or {}
         return _candle_rows(ticker, end, d.get("candlesticks", []))
 
