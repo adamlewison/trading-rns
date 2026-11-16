@@ -175,3 +175,12 @@ no clean last close, 2 no admission date → **50 used**.
 **What would settle it:** a live record of real allocations. Apply for the minimum (often £100–250)
 in each open retail offer on PrimaryBid or through a RetailBook broker for a few months and note the
 amount received; that measures the one thing the backtest has to assume.
+
+## FROZEN for the final test (2026-11-16, by the user's decision although the choose period was too small)
+**A-open:** apply to every included retail offer (not existing-holders-only, clean last close ≥ 5p,
+20-day turnover ≥ £25,000), sell at the open of the admission day; £500 per offer, at most 6 outstanding.
+Run ONCE on launches from 2025-01-01 with `backtest.uk_retail_offers final --final`.
+**Final pass (unchanged):** under adverse allocation, mean net return above the FTSE All-Share's over
+the same days with t ≥ 2 (clustered by launch week), and positive money made in total; fewer than 100
+offers = too small to judge. The full-allocation figure and the other three variants are printed for
+information only.
