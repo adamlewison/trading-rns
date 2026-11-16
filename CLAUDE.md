@@ -269,7 +269,7 @@ small caps.
 | **Droplet control** | `deploy/on-droplet.sh "CMD" [DIR]` picks the route: SSH if this machine can, else the B2 job queue | see *Reaching the droplet* below |
 | **Keys** | `.env.example` lists every key and where it lives | cloud sessions: environment network secrets (B2, OpenAI, Vercel) injected by the proxy; droplet: `.env` files |
 | **Paper trading** | `paper/factors.py`, droplet timer `trading-rns-paper` (weekdays 22:30 UTC; acts on the first trading day of each month) | tables `paper_picks`, `paper_marks` (backed up); summary in B2 `trading-rns/paper/status.md`; setup `deploy/setup-paper.sh` |
-| **Retail-offers trial** | `paper/retail_offers.py`, droplet timer `trading-rns-retail` (weekdays 07:30 and 17:30 UK, from `/opt/trading-rns-pm`) | scans new announcements, reads retail offers with Luna, status in B2 `trading-rns/paper/retail_offers.md`; setup `deploy/setup-retail.sh`; applications are made by hand (no broker API) |
+| **Retail-offers trial** | `paper/retail_offers.py`, droplet timer `trading-rns-retail` (weekdays, from `/opt/trading-rns-pm`) | scans new announcements (07:30, 17:30, 18:45 UK), reads retail offers with Luna, sends a phone alert through ntfy for each new offer open to new investors (topic name in the droplet's `/opt/trading-rns-pm/.env` as `NTFY_TOPIC`, never in git), status in B2 `trading-rns/paper/retail_offers.md`; setup `deploy/setup-retail.sh`; applications are made by hand (no broker API) |
 | **Scheduled check-in** | a Claude scheduled task that checks the droplet and LLM runs every ~5 hours | re-arms itself; stop it when nothing is running |
 
 **Reaching the droplet** (it depends where the agent runs; `deploy/on-droplet.sh` tries 1 then 2)
