@@ -262,53 +262,84 @@ def batches(rows: list[tuple], size: int = 40, span_s: float = 86400.0) -> list[
     return out
 
 
-def cmd_candles(cl: Client) -> None:
+PLAN = ROOT / "candle_plan.jsonl"
+CHOOSE_END_TS = 1767225599            # 2025-12-31 23:59:59 UTC (design: choose period)
+BATCH_FROM_TS = 1772323200            # 2026-03-01: older markets are only served one at a time
+
+
+def cmd_plan() -> None:
+    """Needs the full market list in memory (run in a cloud session, not on the 1GB droplet):
+    writes the fixed sample of eligible markets with their scheduled ends."""
     con = load_markets()
-    rows = []
-    for ticker, series, exp, latest, _ in eligible(con):
-        end = ts(str(exp) if exp else None) or ts(str(latest) if latest else None)
-        if end:
-            rows.append((ticker, series, end))
+    n = 0
+    with PLAN.open("w") as f:
+        for ticker, series, exp, latest, _ in eligible(con):
+            end = ts(str(exp) if exp else None) or ts(str(latest) if latest else None)
+            if end:
+                f.write(json.dumps({"ticker": ticker, "series": series, "end": end}) + "\n")
+                n += 1
+    print(f"plan: {n} markets")
+
+
+def _candle_rows(ticker: str, end: float, candles: list[dict]) -> list[dict]:
+    def num(d: dict, k: str):
+        v = d.get(k + "_dollars", d.get(k))
+        return None if v is None else float(v)
+    out = []
+    for c in candles:
+        if not end - WINDOW_DAYS * 86400 <= c["end_period_ts"] <= end + 3600:
+            continue
+        a, b, p = c.get("yes_ask") or {}, c.get("yes_bid") or {}, c.get("price") or {}
+        out.append({"ticker": ticker, "t": c["end_period_ts"],
+                    "ask_o": num(a, "open"), "ask_c": num(a, "close"),
+                    "bid_o": num(b, "open"), "bid_c": num(b, "close"),
+                    "last": num(p, "close"), "vol": float(c.get("volume_fp", c.get("volume", 0)) or 0)})
+    return out
+
+
+def cmd_candles(cl: Client, choose_only: bool = False) -> None:
+    """Reads the plan (light enough for the droplet). Recent markets go 40 to a request; older ones,
+    and any the batch call returns nothing for, are fetched one at a time from the historical tier."""
+    rows = [(r["ticker"], r["series"], r["end"]) for r in map(json.loads, PLAN.read_text().splitlines())]
+    if choose_only:
+        rows = [r for r in rows if r[2] <= CHOOSE_END_TS]
     done_path = ROOT / "candles.done"
     done = _done(done_path)
     todo = batches([r for r in rows if r[0] not in done])
-    print(f"{sum(map(len, todo))} of {len(rows)} eligible markets need candles ({len(todo)} requests)", flush=True)
+    print(f"{sum(map(len, todo))} of {len(rows)} planned markets need candles ({len(todo)} batches)", flush=True)
     shards = Shards(ROOT / "candles", "c", rotate=1_000_000)
     wlock = threading.Lock()
     count = [0, 0, time.time()]
 
-    def num(d: dict, k: str):
-        v = d.get(k + "_dollars", d.get(k))
-        return None if v is None else float(v)
+    def single(ticker: str, end: float) -> list[dict]:
+        d = cl.get(f"/historical/markets/{ticker}/candlesticks",
+                   {"start_ts": int(end - WINDOW_DAYS * 86400), "end_ts": int(end + 3600), "period_interval": 60}) or {}
+        return _candle_rows(ticker, end, d.get("candlesticks", []))
 
     def work(batch: list[tuple]) -> None:
         ends = {t: e for t, _, e in batch}
-        d = cl.get("/markets/candlesticks",
-                   {"market_tickers": ",".join(ends), "start_ts": int(min(ends.values()) - WINDOW_DAYS * 86400),
-                    "end_ts": int(max(ends.values()) + 3600), "period_interval": 60}) or {}
-        out = []
-        for m in d.get("markets", []):
-            ticker = m.get("market_ticker")
-            end = ends.get(ticker)
-            if end is None:
-                continue
-            for c in m.get("candlesticks", []):
-                if not end - WINDOW_DAYS * 86400 <= c["end_period_ts"] <= end + 3600:
-                    continue
-                a, b, p = c.get("yes_ask") or {}, c.get("yes_bid") or {}, c.get("price") or {}
-                out.append({"ticker": ticker, "t": c["end_period_ts"],
-                            "ask_o": num(a, "open"), "ask_c": num(a, "close"),
-                            "bid_o": num(b, "open"), "bid_c": num(b, "close"),
-                            "last": num(p, "close"), "vol": float(c.get("volume_fp", c.get("volume", 0)) or 0)})
+        out, got = [], set()
+        if max(ends.values()) >= BATCH_FROM_TS:
+            d = cl.get("/markets/candlesticks",
+                       {"market_tickers": ",".join(ends), "start_ts": int(min(ends.values()) - WINDOW_DAYS * 86400),
+                        "end_ts": int(max(ends.values()) + 3600), "period_interval": 60}) or {}
+            for m in d.get("markets", []):
+                t = m.get("market_ticker")
+                if t in ends and m.get("candlesticks"):
+                    out += _candle_rows(t, ends[t], m["candlesticks"])
+                    got.add(t)
+        for t, e in ends.items():
+            if t not in got:
+                out += single(t, e)
         shards.write(out)                       # rows are on disk before the markets are marked done
         with wlock:
             with done_path.open("a") as f:
                 f.write("".join(t + "\n" for t in ends))
             count[0] += len(ends)
             count[1] += len(out)
-            if time.time() - count[2] > 60:
+            if time.time() - count[2] > 300:
                 count[2] = time.time()
-                print(f"{count[0]} markets, {count[1]} candles, {cl.n} requests, {cl.n429} x 429", flush=True)
+                print(f"{count[0]} markets, {count[1]} candles, {cl.n} requests, {cl.n429} x 429, rate {cl.rate:.1f}/s", flush=True)
 
     try:
         with ThreadPoolExecutor(4) as ex:
@@ -328,8 +359,10 @@ def cmd_status() -> None:
 
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "status"
-    if cmd in ("status", "upload", "download"):
-        {"status": cmd_status, "upload": cmd_upload, "download": cmd_download}[cmd]()
+    if cmd in ("status", "upload", "download", "plan"):
+        {"status": cmd_status, "upload": cmd_upload, "download": cmd_download, "plan": cmd_plan}[cmd]()
+    elif cmd == "candles":
+        cmd_candles(Client(), choose_only="--choose-only" in sys.argv)
     else:
-        {"series": cmd_series, "markets": cmd_markets, "candles": cmd_candles}[cmd](Client())
+        {"series": cmd_series, "markets": cmd_markets}[cmd](Client())
         print("finished", datetime.now(timezone.utc).isoformat(timespec="seconds"))
