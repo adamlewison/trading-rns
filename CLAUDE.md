@@ -63,8 +63,7 @@ then paper trading, then small size.
   2026-11-16** (the user applies by hand for the minimum in every offer open to new investors and reports it; an agent
   adds it to `paper/retail_offers_log.csv`; rules in the design, "Live trial"; judge after 20 applications or six months). **Trust discounts: passed its choose period (2015–2021)** with the Z-catalyst variant
   (£8,764 vs £7,361 for the index, 5 of 7 years, placebo 0 of 30) and **waits for the user's go-ahead to run the
-  final test once** on 2022 → now; the edge per holding is thin (t 1.4). **Prediction markets:**
-  the Kalshi listing runs on the droplet (unit `kalshi-list`); next steps in `DESIGN_PM_FAVOURITES.md` ("State").
+  final test once** on 2022 → now; the edge per holding is thin (t 1.4). **Prediction markets:** failed (section 6).
   **Odd-lot tenders:** public sources say a UK holder has 15% of gross proceeds withheld unless the broker accepts a
   Section 302 certificate; IBKR's AI assistant (2026-11-16) did not say it passes one on, so assume withholding applies: the track is
   shelved unless IBKR's corporate-actions desk confirms otherwise in writing.
@@ -134,6 +133,8 @@ then paper trading, then small size.
     stock portfolio strays ~10% a year from the index, so over 2022 → now a ±20-point gap is one standard
     deviation of chance (quality's −22 points is that). Prefer trades with a large, structural edge per trade
     (someone forced to sell, or a prize too small for funds), judged per trade against the index over the same days.
+18. **A quoted price is not a tradable price.** On Kalshi a 97c ask often sat over an empty book; signals must
+    use both sides of the quote (or the gap), and the test must fill at the side you would actually pay.
 17. **Fast compounding needs near-certain trades, not bigger targets.** 1% a day is 12× a year (the best fund
     ever made ~66%); growth comes from how reliable the edge is and how often capital turns over, and only a
     reliable edge can be sized large. Fixed $150 slots (2.5% of the account) cannot compound whatever the edge.
@@ -172,6 +173,8 @@ then paper trading, then small size.
 
 | UK retail offers (PrimaryBid, RetailBook, WRAP, REX): apply at the placing price, sell at the open on admission; £500 an offer; Luna read 1,134 announcements (£0.38) | **Too small to judge in both periods** (50 usable offers to end-2024, 18 in 2025–26; 100 required; half of all launches are for existing holders only). Filled in full: +4.7% and +6.2% over the index per offer in ~11 days (t 2.9 and 1.1), resting on a few big winners; with popular offers scaled back to a quarter: +0.7% and −0.3%. Allocation decides it and only a live record can measure it. Final period spent | `backtest/DESIGN_UK_RETAIL_OFFERS.md` |
 
+| Prediction-market near-certainties (Kalshi history, 21m settled markets listed, 16,950 sampled with hourly bid/ask): buy the side whose ask is 90–98c within 2 or 7 days of the scheduled end, hold to settlement | **Failed on markets ending up to 2025** (2026 unused; not tradable from the UK anyway): −16% to −19% per bet, because an ask at 97c in a thin market is not a 97% market (a third of bets crossed a gap above 20c and won 62%). Where the gap was a cent the favourite won as often as its price (96.3% at 96.8c): nothing after fees | `backtest/DESIGN_PM_FAVOURITES.md` |
+
 Every strategy whose final test ran has spent its final years: further work on them can only be judged live (paper trading)
 or with delisted prices. Open lead: the insider model's small-stock picks (worth a paper trial).
 
@@ -183,11 +186,10 @@ Each has a full plan written 2026-11-15 **before any data or result was seen**. 
 | # | Strategy | Plan | Needs | Why here |
 |---|---|---|---|---|
 | 1 | **Odd-lot tender offers** (US): buy ≤ 99 shares below a company's own tender price and tender them | `DESIGN_ODD_LOT.md` | EDGAR SC TO-I pull; Luna < $5. **Shelved:** IBKR gave no sign it passes on a Section 302 certificate, so assume 15% of proceeds is withheld for a UK holder (detail in the design) | A prize too small for funds; capped, so it adds income but does not compound |
-| 3 | **Prediction-market near-certainties** (Kalshi history): buy contracts at 90–98c days before they settle | `DESIGN_PM_FAVOURITES.md`; ingest and backtest written, not run | the droplet's listing to finish, then 1–2 h of candles | Closest real thing to "1–3% in days", stakes compound. ⚠️ Kalshi and Polymarket are closed to UK residents: a pass is evidence only, then Betfair data is needed |
 | 5 | **UK investment trust discounts**: buy equity trusts whose discount is ≥ 1.5 standard deviations wider than their own last 12 months and wider than −8%; sell when back to normal or after 6 months | `DESIGN_UK_TRUST_DISCOUNTS.md` | the user's go-ahead for the final test (2022 → now) | **Passed 2015–2021:** £8,764 vs £7,361 for the FTSE All-Share, 5 of 7 years, 66 holdings; discounts narrowed 3.2% per holding (placebo 0.9%). Thin: +1.7% per holding vs the index (t 1.4), ~2% costs, negative without the best five. Holds ~4 months |
 | 7 | **US news drift** (deals, CEO exits, profit warnings) | none | Luna ~$140 | Only with a reason to expect a bigger effect than earnings |
 
-**Run order for a cheaper model:** 3, then 5. One at a time; stop and report after each choose run.
+**Next:** the trust-discount final test, once the user agrees.
 Not planned: **UK possible offers** (Rule 2.4, hold to the 28-day deadline): acquired targets have no
 prices, so it needs delisted data first. Sparse strategies assume idle cash sits in the index fund.
 

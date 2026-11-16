@@ -137,3 +137,44 @@ bets first. Equity for sizing = cash + cost of open bets.
 - `backtest/pm_favourites.py` implements steps 1–4 and is unit-tested on hand-made markets
   (`tests/test_pm_favourites.py`); it has never been run on real data. SPY for the comparison comes from
   `data/us_min/us_etf_daily.parquet` (B2 `trading-rns/us/v1/db/us_etf_daily.parquet`).
+
+## Choose-period result (scheduled end up to 2025-12-31, run 2026-11-16): FAILED
+⚠️ Not tradable from the UK in any case. Final period (2026 →) not run; its candles were not fetched.
+
+**Data:** 21,060,357 settled markets listed (10,780 series), 2,418,832 eligible (volume ≥ 1,000). The
+fixed sample of 150,000 holds 16,950 choose-period markets; hourly candles came back for 16,522
+(596,251 candles). Scheduled-end check passed: 288,692 early-closing markets closed more than a day
+before their scheduled end, so the field is not rewritten to the actual close.
+
+| Variant | Bets | Avg price paid | Won | Total losses | Mean return per bet | t (series-day) | Account ($6,000 start) | SPY |
+|---|---|---|---|---|---|---|---|---|
+| B95-W2 | 3,512 | 96.6c | 81.4% | 650 | −15.9% | −23.0 | −99% | +57% |
+| B95-W7 | 4,002 | 96.7c | 78.7% | 846 | −18.6% | −26.0 | −99% | +57% |
+| B90-W2 | 3,333 | 92.0c | 78.0% | 732 | −15.8% | −19.5 | −99% | +57% |
+| B90-W7 | 3,912 | 92.0c | 75.3% | 961 | −18.6% | −22.9 | −99% | +57% |
+
+**Why it is so bad (checked, because a result this extreme is a bug until shown otherwise).** The rule
+signals on the *ask* alone. In thin markets the ask sits at 95–98c while the bid is far below: the
+market does not believe 97%, the book is just empty. A third of B95-W2 bets had a bid-ask gap above 20c
+and won 62% of the time; the mirror (buying the other side at its ask) loses too, which is what paying
+a wide spread on both sides looks like. This is a flaw in the rule as designed, not in the code: the
+fills, payoffs and fees were verified by the unit tests and by reading the best and worst bets.
+
+**The question the test was meant to answer, by bid-ask gap at the signal (information only: this
+split was made after seeing the result):**
+
+| Gap at signal | B95-W2 bets | Price paid | Won | Mean return (t) | B90-W2 bets | Price paid | Won | Mean return (t) |
+|---|---|---|---|---|---|---|---|---|
+| ≤ 1c | 242 | 96.8c | 96.3% | −0.8% (−0.6) | 240 | 92.0c | 92.9% | +0.4% (0.2) |
+| 1–2c | 244 | 96.6c | 94.3% | −2.7% (−1.7) | 213 | 92.0c | 88.7% | −4.2% (−1.8) |
+| 2–5c | 884 | 96.5c | 91.2% | −5.8% (−5.8) | 967 | 91.9c | 86.3% | −6.6% (−5.5) |
+| 5–20c | 958 | 96.6c | 88.6% | −8.3% (−7.9) | 893 | 92.0c | 83.3% | −9.9% (−7.2) |
+| > 20c | 1,184 | 96.7c | 62.4% | −35.5% (−24.2) | 1,020 | 92.2c | 59.6% | −35.8% (−21.2) |
+
+Where the market really is at 97c (gap of a cent), the favourite wins about as often as its price says
+(96.3% at 96.8c; 92.9% at 92.0c): after the fee there is nothing, in any year or category with enough
+bets. So there is no cheap-favourite edge for someone who buys at the ask on Kalshi, and anything
+wider than a cent is a loss. A maker (resting bids instead of taking asks) might earn the spread, which
+is a different strategy needing order-book data we do not have.
+
+**Verdict: failed.** No further work on this track unless UK access opens and a maker-side design is written.
