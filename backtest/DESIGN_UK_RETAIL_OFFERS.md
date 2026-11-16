@@ -184,3 +184,27 @@ Run ONCE on launches from 2025-01-01 with `backtest.uk_retail_offers final --fin
 the same days with t ≥ 2 (clustered by launch week), and positive money made in total; fewer than 100
 offers = too small to judge. The full-allocation figure and the other three variants are printed for
 information only.
+
+## FINAL TEST RESULT (launches 2025-01-01 → 2026-11, run once, 2026-11-16): TOO SMALL TO JUDGE
+288 launch announcements → 90 offers after removing 32 without a price, 151 for existing holders only
+and 15 repeats → **18 usable** (31 too small or illiquid, 19 without prices, 13 without a clean last
+close, 9 with a price that cannot be compared). 100 were required.
+
+| A-open (frozen), 18 offers | |
+|---|---|
+| Winners after costs | 56% |
+| Mean net return per offer (median) | +7.3% (+2.8%) |
+| Excess over the index, full allocation (t) | +6.2% (1.1) |
+| **Excess over the index, adverse allocation (t)** | **−0.3% (−0.2)** |
+| Adverse, without the best 5 offers | −3.7% |
+| £500 an offer, adverse allocation | +£22 against +£52 for the index on the same money |
+
+For information, the other variants under adverse allocation: A-close +0.5%, D5-open +0.2%, D5-close +0.3%
+(t all below 0.2). Average discount 16%, average wait 11–14 days, a third below the issue price at admission.
+
+The picture is the same as in the choose period: filled in full the offers look good on average
+(+4.7% and +6.2% over the index) but the average rests on a few large winners and is not
+statistically reliable at these counts; with popular offers scaled back to a quarter there is nothing
+(+0.7% and −0.3%). More offers than expected were for existing holders only, so the final period was
+smaller than the choose period, not larger. The final period is now spent. No further backtest can
+settle this: only a record of real allocations can.
