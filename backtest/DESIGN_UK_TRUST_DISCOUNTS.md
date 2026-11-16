@@ -121,3 +121,39 @@ Choose: 2015–2021 (2013–2014 only build the 12-month history). Final: 2022 �
 - ⚠️ The universe is filtered by NAV frequency only; no sector data, so a few frequent-NAV debt funds remain.
 - **Next:** write `backtest/uk_trust_discounts.py` to the Rules above (monthly, z-score on the previous
   12 months, variants Z, Z-catalyst, W), unit tests, then the choose period 2015–2021 only.
+
+## Choose-period result (2015–2021, run 2026-11-16): Z-catalyst PASSES to the final test
+£5,000 account, £1,000 a holding, idle money in the FTSE All-Share (with dividends), all costs. 99 trusts
+had a z-score in the period; 12% of trust-months had z ≤ −1.5. Final period (2022 →) not run.
+
+| Variant | Account at end 2021 | Index | Years beating the index | Completed holdings | Per holding vs index (t) | Discount capture | Verdict |
+|---|---|---|---|---|---|---|---|
+| Z | £8,158 | £7,361 | 3 of 7 | 84 | +0.8% (0.9) | +3.3% | fails (4 years needed) |
+| **Z-catalyst** | **£8,764** | £7,361 | **5 of 7** | 66 | +1.7% (1.4) | +3.2% | **passes** |
+| W (widest five, baseline) | £7,346 | £7,361 | 4 of 7 | 182 | 0.0% (0.1) | +2.6% | baseline |
+
+Z-catalyst by year, account minus index: 2015 −5.6, 2016 +6.2, 2017 +1.2, 2018 +1.6, 2019 +3.2,
+2020 +12.6, 2021 −1.1 points. It meets every part of the pass rule: beats the index over the period
+and in 5 of 7 years, beats W, 66 completed holdings (60 required), and the discount capture is positive.
+
+**Checks**
+- Placebo (the same z-scores given to random trusts each month, 30 runs): Z-catalyst ends at £7,110 on
+  average (5–95%: £5,653–£8,313); none of the 30 reaches the real £8,764. Discount capture in the placebo
+  is +0.9% against +3.2% for the real signal. Same picture for Z (0 of 30). The signal does pick trusts
+  whose discounts then narrow.
+- The mechanism is visible: average discount −13.9% at entry, −11.3% at exit, about four months held.
+- Without 2020: strategy +66%, index +59% over the other six years. Still ahead, by less (lesson 14).
+- Too-good rule: not triggered. Ten best and worst holdings printed and read; dates and discounts consistent.
+
+**What weakens it**
+- ⚠️ The per-holding edge is not statistically firm: +1.7% over the index, t 1.4, and −0.2% without the
+  five best holdings. The account result rests on a minority of large narrowings.
+- ⚠️ Only 66 holdings in 38 trusts, uneven by year (4 in 2017, 2 in 2021).
+- ⚠️ Costs are estimates (stamp duty 0.5%, spread by turnover, 0.25% slippage each side): about 2% a
+  round trip against a 3.2% capture, so the margin is thin.
+- ⚠️ Universe is today's list of trusts, 53 without prices; frequent-NAV debt funds are not removed.
+- 2022–2023 saw discounts widen for two years; a rule that buys widening discounts was exposed to that.
+
+**Proposed freeze:** Z-catalyst exactly as written (z ≤ −1.5 on the previous 12 months, discount wider
+than −8%, up to 5 holdings, sell at z ≥ 0 or after 6 monthly checks). Final test: 2022-01 → latest,
+once, after the user agrees: `backtest.uk_trust_discounts final --final`.
