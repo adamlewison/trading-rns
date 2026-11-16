@@ -143,3 +143,13 @@ holder is scaled back and left with shares that fall after expiry; (b) using the
 - **Odd-lot election and fee:** not stated publicly. Offer documents say a broker "may charge a fee".
 - Odd-lot terms confirmed in a real offer: fewer than 100 shares owned, all of them tendered, and the
   odd-lot box completed; modified Dutch auctions give a price range (for example $51–58).
+
+## IBKR's reply (2026-11-16, its website AI assistant, relayed by the user): does not settle it
+It confirmed the default (tender proceeds may be treated as a dividend and withheld at 30%, or the
+treaty rate, unless Section 302 applies) and that withheld amounts are reported on Form 1042-S. On the
+deciding point it said only that Section 302 certificates go to the issuer's depositary under the offer
+documents, "not by our internal processes", and that it cannot make the determination. It did not say
+that IBKR passes such a certificate on for shares it holds for a client. Read plainly, IBKR has no
+routine way to do it, so the working assumption is that a UK holder is withheld at 15% of gross
+proceeds. Odd-lot elections: "depends on the offer"; fees: not given. The track stays shelved unless a
+person on IBKR's corporate-actions desk confirms in writing that the certificate can be submitted.

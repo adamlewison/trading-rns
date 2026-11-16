@@ -64,7 +64,8 @@ then paper trading, then small size.
   next steps in its design). **Prediction markets:**
   the Kalshi listing runs on the droplet (unit `kalshi-list`); next steps in `DESIGN_PM_FAVOURITES.md` ("State").
   **Odd-lot tenders:** public sources say a UK holder has 15% of gross proceeds withheld unless the broker accepts a
-  Section 302 certificate; whether IBKR does is unknown and decides the track (the user is asking IBKR).
+  Section 302 certificate; IBKR's AI assistant (2026-11-16) did not say it passes one on, so assume withholding applies: the track is
+  shelved unless IBKR's corporate-actions desk confirms otherwise in writing.
 - Droplet runner (`trading-rns-agent`) installed 2026-11-12: agents reach the droplet themselves (~6s a command).
 - US Luna leftovers: 150,457 of 150,518 labelled; 13 small batches still at OpenAI (`luna-run` on the droplet). When done: `classify.labels build`, then `features.us_earnings_labels build`.
 
@@ -177,7 +178,7 @@ Each has a full plan written 2026-11-15 **before any data or result was seen**. 
 
 | # | Strategy | Plan | Needs | Why here |
 |---|---|---|---|---|
-| 1 | **Odd-lot tender offers** (US): buy ≤ 99 shares below a company's own tender price and tender them | `DESIGN_ODD_LOT.md` | EDGAR SC TO-I pull; Luna < $5. **Blocked on one question to IBKR:** does it accept a Section 302 certificate so that tender proceeds are not withheld at 15%? (research in the design) | A prize too small for funds; capped, so it adds income but does not compound |
+| 1 | **Odd-lot tender offers** (US): buy ≤ 99 shares below a company's own tender price and tender them | `DESIGN_ODD_LOT.md` | EDGAR SC TO-I pull; Luna < $5. **Shelved:** IBKR gave no sign it passes on a Section 302 certificate, so assume 15% of proceeds is withheld for a UK holder (detail in the design) | A prize too small for funds; capped, so it adds income but does not compound |
 | 2 | **UK retail offers** (PrimaryBid / RetailBook): placing stock at the discount, sold on admission | `DESIGN_UK_RETAIL_OFFERS.md` | a live record of real allocations (apply for the minimum in each offer); final period 2025 → unused | **Too small to judge** (50 usable offers to end-2024; 100 required). Filled in full: +4.7% over the index per offer in 11 days (t 2.9); if popular offers are scaled back to a quarter: +0.7% (t 1.0). Allocation decides it and can only be measured live. ⚠️ survivorship flatters |
 | 3 | **Prediction-market near-certainties** (Kalshi history): buy contracts at 90–98c days before they settle | `DESIGN_PM_FAVOURITES.md`; ingest and backtest written, not run | the droplet's listing to finish, then 1–2 h of candles | Closest real thing to "1–3% in days", stakes compound. ⚠️ Kalshi and Polymarket are closed to UK residents: a pass is evidence only, then Betfair data is needed |
 | 5 | **UK investment trust discounts**: buy equity trusts when the discount is wide vs their own 12 months | `DESIGN_UK_TRUST_DISCOUNTS.md` | the droplet's pull (unit `trust-data`) to finish, then NAV parsing and prices with split history | Clearest reason to beat an index, but holds of months (not the user's preference) and the most data work |
