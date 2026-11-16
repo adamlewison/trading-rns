@@ -165,3 +165,22 @@ month is at least 1.5 standard deviations wider than their previous 12 monthly d
 money in the FTSE All-Share with dividends; costs as above. Run ONCE on 2022-01 → latest with
 `backtest.uk_trust_discounts final --final`. **Pass:** the account ends above the all-index account,
 and the discount capture per holding is positive. Z and W are printed for information only.
+
+## FINAL TEST RESULT (2022-01 → 2026-11, run once, 2026-11-16): FAILS
+| | Account (£5,000 start) | 2022 | 2023 | 2024 | 2025 | 2026 | Completed holdings | Per holding vs index (t) | Discount capture |
+|---|---|---|---|---|---|---|---|---|---|
+| **Z-catalyst (frozen)** | **£5,825** | −14.2% | −9.5% | −2.6% | +21.9% | +26.4% | 50 | −2.4% (−1.3) | +2.5% |
+| FTSE All-Share | £8,019 | −0.1% | +2.3% | +14.7% | +19.3% | +14.7% | | | |
+| Z (information) | £6,108 | −4.5% | −10.4% | +4.5% | +18.0% | +15.9% | 60 | −1.8% (−1.4) | +2.0% |
+| W (information) | £6,892 | −20.3% | +11.0% | +12.2% | +30.2% | +6.7% | 119 | −0.7% (−0.5) | +2.9% |
+
+The account made +16.5% against +60% for the index and beat it in 2 of 5 years. The discount signal
+still worked: discounts narrowed by 2.5% per holding on average (−14.2% at entry, −12.2% at exit), close
+to the choose period's 3.2%. What failed was what the trusts hold: their assets (smaller companies,
+growth, emerging markets, alternatives) lagged the FTSE All-Share badly in 2022–2024, and a 2.5%
+narrowing less about 2% of costs cannot offset that. Only 38% of holdings beat the index.
+
+So the edge from the discount is real but small, and choosing trusts by their discount means taking
+whatever asset exposure comes with them, which swamps it. Capturing the narrowing alone would need
+hedging each trust against its own holdings, which a small long-only account cannot do. The final
+years are now spent.
