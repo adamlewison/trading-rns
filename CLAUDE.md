@@ -131,6 +131,9 @@ then paper trading, then small size.
     stock portfolio strays ~10% a year from the index, so over 2022 → now a ±20-point gap is one standard
     deviation of chance (quality's −22 points is that). Prefer trades with a large, structural edge per trade
     (someone forced to sell, or a prize too small for funds), judged per trade against the index over the same days.
+20. **Fourteen tests, no pass: predicting prices does not pay at this size; being paid for a service might.** The
+    only positive numbers came from taking stock others want placed (retail offers). Look for trades where someone
+    pays for liquidity, hassle or small size, and judge them live, since such edges leave no usable history.
 19. **A real but small mispricing is swamped by the exposure that comes with it.** Trust discounts did narrow
     (+2.5–3.2% per holding in both periods) but long-only you also own the trust's assets, which decided the result.
     Without a hedge, an edge has to be large against the asset's own swings, not just positive.
@@ -189,8 +192,11 @@ Each has a full plan written 2026-11-15 **before any data or result was seen**. 
 | # | Strategy | Plan | Needs | Why here |
 |---|---|---|---|---|
 | 1 | **Odd-lot tender offers** (US): buy ≤ 99 shares below a company's own tender price and tender them | `DESIGN_ODD_LOT.md` | EDGAR SC TO-I pull; Luna < $5. **Shelved:** IBKR gave no sign it passes on a Section 302 certificate, so assume 15% of proceeds is withheld for a UK holder (detail in the design) | A prize too small for funds; capped, so it adds income but does not compound |
+| 2 | **Passive orders in wide-spread AIM shares** (IBKR API): rest a bid at the best bid, and once filled an offer at the best ask; no orders on days with company news (our RNS feed) | none yet | LSE live quotes through IBKR (small monthly fee, the user's OK needed); a design; live paper test only (no order-book history) | Be the one who is paid the 2–3% spread that sank our UK tests instead of paying it; AIM has no stamp duty; a small account is an advantage in a thin book. Risk: being filled just before bad news and left holding the shares |
+| 3 | **Betting-exchange offers and liquidity** (UK-legal, winnings untaxed): hedged bookmaker offers ("matched betting"), later resting orders in thin exchange markets | none yet | the user's own bookmaker and exchange accounts; an odds matcher we could build | Near-certain, short trades, which is what the user asked for; limited by the number of offers and by bookmakers restricting accounts, so it does not compound; not securities trading |
 | 7 | **US news drift** (deals, CEO exits, profit warnings) | none | Luna ~$140 | Only with a reason to expect a bigger effect than earnings |
 
+Ideas 2 and 3 were added 2026-11-16 after every backtest failed (lesson 20); neither can be backtested with data we have.
 **Nothing on the 2026-11-15 list is left to backtest.** Running live: the retail-offers trial and the paper factor portfolios.
 Not planned: **UK possible offers** (Rule 2.4, hold to the 28-day deadline): acquired targets have no
 prices, so it needs delisted data first. Sparse strategies assume idle cash sits in the index fund.
