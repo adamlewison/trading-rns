@@ -157,3 +157,11 @@ and in 5 of 7 years, beats W, 66 completed holdings (60 required), and the disco
 **Proposed freeze:** Z-catalyst exactly as written (z ≤ −1.5 on the previous 12 months, discount wider
 than −8%, up to 5 holdings, sell at z ≥ 0 or after 6 monthly checks). Final test: 2022-01 → latest,
 once, after the user agrees: `backtest.uk_trust_discounts final --final`.
+
+## FROZEN for the final test (2026-11-16, user agreed)
+**Z-catalyst:** on the first trading day of each month, buy trusts whose last discount of the previous
+month is at least 1.5 standard deviations wider than their previous 12 monthly discounts and wider than
+−8%, most extreme first, up to 5 holdings of £1,000; sell when z ≥ 0 or after 6 monthly checks; idle
+money in the FTSE All-Share with dividends; costs as above. Run ONCE on 2022-01 → latest with
+`backtest.uk_trust_discounts final --final`. **Pass:** the account ends above the all-index account,
+and the discount capture per holding is positive. Z and W are printed for information only.
