@@ -63,7 +63,7 @@ def label() -> None:
         old = get_store().get(lab.B2_NAME)
         if old:
             lab.OUT.write_bytes(old)
-    lab.run(max_gbp=0.5)
+    lab.run(max_gbp=0.5, since=TRIAL_START - timedelta(days=1))
 
 
 def prices(tidm: str) -> pd.DataFrame:

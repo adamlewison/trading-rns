@@ -71,12 +71,16 @@ does not state something, answer null. Never guess and never use outside knowled
 - cancelled: true only if the text says the retail offer was withdrawn, cancelled or did not proceed."""
 
 
-def select() -> pd.DataFrame:
+def select(since=None) -> pd.DataFrame:
+    """since: only announcements from that date (the droplet has 1GB: never load every text there)."""
+    recent = f"AND i.published_uk >= '{since}'" if since else ""
     with session(read_only=True) as con:
-        return con.execute(f"""SELECT i.ann_id, i.tidm, i.headline, i.published_uk, b.body_text
-            FROM ann_index i JOIN ann_bodies b USING (ann_id)
-            WHERE regexp_matches(lower(i.headline), '{HEADLINE_RE}') AND b.status = 'ok'
-            ORDER BY i.published_uk""").df()
+        ids = con.execute(f"""SELECT ann_id, tidm, headline, published_uk FROM ann_index i
+            WHERE regexp_matches(lower(i.headline), '{HEADLINE_RE}') {recent}""").df()
+        con.register("ids", ids[["ann_id"]])
+        body = con.execute("""SELECT b.ann_id, b.body_text FROM ann_bodies b SEMI JOIN ids USING (ann_id)
+            WHERE b.status = 'ok'""").df()
+    return ids.merge(body, on="ann_id").sort_values("published_uk").reset_index(drop=True)
 
 
 def done() -> dict[str, dict]:
@@ -85,8 +89,8 @@ def done() -> dict[str, dict]:
     return {r["ann_id"]: r for r in map(json.loads, OUT.read_text().splitlines()) if r.get("label")}
 
 
-def run(max_gbp: float, workers: int = 8) -> None:
-    df = select()
+def run(max_gbp: float, workers: int = 8, since=None) -> None:
+    df = select(since)
     have = done()
     todo = df[~df.ann_id.isin(have)]
     est = of.cost_gbp(int(todo.body_text.str.len().clip(upper=MAX_CHARS).sum() / 3.4) + 700 * len(todo), 0, 150 * len(todo)) * 2
