@@ -61,8 +61,8 @@ then paper trading, then small size.
 - **State 2026-11-16** (plans in section 7, procedure in `backtest/RUNBOOK.md`): tax-loss rebound and crypto trend
   have failed (section 6). **UK retail offers:** both periods run, too small to judge (section 6); a **live trial started
   2026-11-16** (the user applies by hand for the minimum in every offer open to new investors and reports it; an agent
-  adds it to `paper/retail_offers_log.csv`; rules in the design, "Live trial"; judge after 20 applications or six months). **Trust discounts:** the data pull runs on the droplet (unit `trust-data`, ~11 h;
-  next steps in its design). **Prediction markets:**
+  adds it to `paper/retail_offers_log.csv`; rules in the design, "Live trial"; judge after 20 applications or six months). **Trust discounts:** data ready (step 0 passed: 113 trusts with 5+ years of monthly
+  discounts; NAVs read by Luna for £3.35; tables in B2 `trading-rns/trusts/v1/`); the backtest is not written. **Prediction markets:**
   the Kalshi listing runs on the droplet (unit `kalshi-list`); next steps in `DESIGN_PM_FAVOURITES.md` ("State").
   **Odd-lot tenders:** public sources say a UK holder has 15% of gross proceeds withheld unless the broker accepts a
   Section 302 certificate; IBKR's AI assistant (2026-11-16) did not say it passes one on, so assume withholding applies: the track is
@@ -183,7 +183,7 @@ Each has a full plan written 2026-11-15 **before any data or result was seen**. 
 |---|---|---|---|---|
 | 1 | **Odd-lot tender offers** (US): buy ≤ 99 shares below a company's own tender price and tender them | `DESIGN_ODD_LOT.md` | EDGAR SC TO-I pull; Luna < $5. **Shelved:** IBKR gave no sign it passes on a Section 302 certificate, so assume 15% of proceeds is withheld for a UK holder (detail in the design) | A prize too small for funds; capped, so it adds income but does not compound |
 | 3 | **Prediction-market near-certainties** (Kalshi history): buy contracts at 90–98c days before they settle | `DESIGN_PM_FAVOURITES.md`; ingest and backtest written, not run | the droplet's listing to finish, then 1–2 h of candles | Closest real thing to "1–3% in days", stakes compound. ⚠️ Kalshi and Polymarket are closed to UK residents: a pass is evidence only, then Betfair data is needed |
-| 5 | **UK investment trust discounts**: buy equity trusts when the discount is wide vs their own 12 months | `DESIGN_UK_TRUST_DISCOUNTS.md` | the droplet's pull (unit `trust-data`) to finish, then NAV parsing and prices with split history | Clearest reason to beat an index, but holds of months (not the user's preference) and the most data work |
+| 5 | **UK investment trust discounts**: buy equity trusts when the discount is wide vs their own 12 months | `DESIGN_UK_TRUST_DISCOUNTS.md` | the backtest to be written and the choose period (2015–2021) run; data and step 0 are done | Clearest reason to beat an index, but holds of months (not the user's preference) and the most data work |
 | 7 | **US news drift** (deals, CEO exits, profit warnings) | none | Luna ~$140 | Only with a reason to expect a bigger effect than earnings |
 
 **Run order for a cheaper model:** 3, then 5. One at a time; stop and report after each choose run.
@@ -316,6 +316,8 @@ uv run python -W ignore -m features.us_earnings build && uv run python -W ignore
 uv run python -W ignore -m backtest.us_account choose --hold 20          # final runs need --final, once
 uv run python -W ignore -m ingest.uk.announcements.run bodies --headline-re 'retail offer|primarybid|retailbook'  # droplet only
 uv run python -W ignore -m classify.uk_retail_offers run --max-gbp 3|report
+uv run python -W ignore -m classify.uk_nav run --max-gbp 5|report         # trust NAVs (done: data/labels/uk_nav.jsonl, B2)
+uv run python -W ignore -m features.uk_trusts prices|build|report         # trust prices (splits undone), monthly discounts, step 0
 uv run python -W ignore -m paper.retail_offers status                    # live trial (droplet runs `daily`)
 uv run python -W ignore -m backtest.uk_retail_offers choose              # final needs --final, once
 uv run python -W ignore -m backtest.crypto_trend data|choose             # final needs --final, once

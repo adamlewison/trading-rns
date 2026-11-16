@@ -87,7 +87,9 @@ def build() -> pd.DataFrame:
     nav = nav_table()
     px = pd.read_parquet(D / "prices.parquet")
     px = px[px.volume > 0].sort_values(["date", "tidm"])
-    nav = nav.sort_values(["nav_date", "tidm"])
+    px["date"] = px.date.astype("datetime64[ns]")
+    nav["nav_date"] = nav.nav_date.astype("datetime64[ns]")
+    nav = nav[nav.nav_date.notna()].sort_values(["nav_date", "tidm"])
     m = pd.merge_asof(nav, px[["tidm", "date", "actual_close", "close"]], left_on="nav_date", right_on="date", by="tidm",
                       tolerance=pd.Timedelta(days=MAX_PRICE_GAP_DAYS))
     m["discount"] = m.actual_close / m.nav_p - 1

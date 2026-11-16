@@ -95,3 +95,29 @@ Choose: 2015–2021 (2013–2014 only build the 12-month history). Final: 2022 �
   held NAV announcements for only about 50 tickers.
 - Next, in a cloud session once the unit has finished and the UK backup has reached B2: pull the UK data,
   parse the NAVs (regex first), fetch trust prices with splits, then step 0 as written above.
+
+## Step 0 result (2026-11-16): data is usable; no strategy result has been looked at
+- **Pull:** the droplet indexed the 288 listed trusts (plus those already held: 330 tickers with NAV
+  announcements, 503,173 of them) and fetched the last NAV announcement of each trust-month: 32,530 texts.
+- **Change to the plan: Luna reads the NAVs, not regex.** The texts come in dozens of layouts (tables,
+  several trusts in one announcement, four bases in one sentence), so regex was dropped before it was
+  written. `classify/uk_nav.py`: £3.35 for all 32,530 (estimate £3.77, cap £5). The model returned a NAV
+  for the named trust in 84% of texts; units: pence 22,232, pounds 993, other currencies 3,810, not stated 5,495.
+- **One basis per trust** (`features/uk_trusts.py`): the first of cum-income/fair, cum-income/par,
+  cum-income, unstated, then ex-income bases that appears in at least 80% of that trust's announcements.
+  Used: unstated 103 trusts, cum income (debt not mentioned) 92, cum income fair 43, cum income par 10, ex income 10.
+- **Prices:** Yahoo, with later splits undone, for 277 of 330 tickers. ⚠️ 53 have none: mostly trusts
+  that merged or wound up (survivorship; direction discussed above).
+- **Counts:** 160 trusts publish at least 40 NAVs a year; 139 of them have prices: 16,176 trust-months.
+  Monthly discounts per year rise from 666 (2012) to about 1,400 (2024–2026).
+  **113 trusts have at least 60 monthly discounts** (80 required).
+- **Parser check:** 98.05% of discounts lie between −60% and +30% (98% required). The rest are unit
+  errors concentrated in five trusts (LTI quotes its NAV in pounds per share against a price in pence;
+  JEMA, CGI, SST, MRC): points outside the range are dropped, not corrected.
+- **Sanity:** the latest discounts match what is publicly known for well-known trusts (Hansa about −40%,
+  City of London and New City High Yield at small premiums). The comparison with 20 AIC figures by hand was not done.
+- ⚠️ The report also printed the median discount per year, including 2022–2026 (between −6.5% and −9.6%).
+  That is the level of discounts in the final period, not a strategy outcome, but it was seen.
+- ⚠️ The universe is filtered by NAV frequency only; no sector data, so a few frequent-NAV debt funds remain.
+- **Next:** write `backtest/uk_trust_discounts.py` to the Rules above (monthly, z-score on the previous
+  12 months, variants Z, Z-catalyst, W), unit tests, then the choose period 2015–2021 only.
