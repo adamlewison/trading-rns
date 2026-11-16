@@ -208,3 +208,20 @@ statistically reliable at these counts; with popular offers scaled back to a qua
 (+0.7% and −0.3%). More offers than expected were for existing holders only, so the final period was
 smaller than the choose period, not larger. The final period is now spent. No further backtest can
 settle this: only a record of real allocations can.
+
+## Live trial (started 2026-11-16, the user's decision; small real money, outside the backtest rules)
+**Purpose:** measure the one thing the backtests had to assume, the share of each application actually received.
+- **The user applies by hand** (no broker API covers this, and IBKR and Trading 212 do not offer retail
+  offers): PrimaryBid's app, or a broker that carries RetailBook, WRAP or REX offers. Apply for the
+  minimum (usually £100–250) in **every** offer open to new investors, without picking; keep no more
+  than about £1,000 outstanding; sell at the open on the admission day.
+- **The user reports** each application to an agent (ticker, amount applied, amount received, sale
+  price); the agent adds a line to `paper/retail_offers_log.csv` and pushes.
+- **The droplet records everything else** twice each weekday (07:30 and 17:30 UK, timer
+  `trading-rns-retail`, `paper.retail_offers daily`): new retail offers from Investegate, their terms
+  (Luna, pennies), and what each would have made if filled in full. Status: `paper.retail_offers status`
+  or B2 `trading-rns/paper/retail_offers.md`.
+- **Judge after 20 applications or six months,** whichever comes first: average share received, and
+  money made against the same money in the index. Skipping offers by feel breaks the test.
+- ⚠️ Offers often close within hours; the platforms' own alerts are the prompt to apply. The droplet's
+  record is for measuring, not for alerting.

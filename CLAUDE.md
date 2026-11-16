@@ -59,8 +59,9 @@ then paper trading, then small size.
 - **The user's account:** about $6,000, around $150 per trade, Trading 212 (IBKR opened 2026-11-15), holds up to ~20 days.
 - **The user's preference (2026-11-15):** short trades (hours to days) whose gains are reinvested (lesson 17).
 - **State 2026-11-16** (plans in section 7, procedure in `backtest/RUNBOOK.md`): tax-loss rebound and crypto trend
-  have failed (section 6). **UK retail offers:** both periods run, too small to judge (section 6); the open question
-  is allocation, measurable only by applying for the minimum in live offers (the user's call). **Trust discounts:** the data pull runs on the droplet (unit `trust-data`, ~11 h;
+  have failed (section 6). **UK retail offers:** both periods run, too small to judge (section 6); a **live trial started
+  2026-11-16** (the user applies by hand for the minimum in every offer open to new investors and reports it; an agent
+  adds it to `paper/retail_offers_log.csv`; rules in the design, "Live trial"; judge after 20 applications or six months). **Trust discounts:** the data pull runs on the droplet (unit `trust-data`, ~11 h;
   next steps in its design). **Prediction markets:**
   the Kalshi listing runs on the droplet (unit `kalshi-list`); next steps in `DESIGN_PM_FAVOURITES.md` ("State").
   **Odd-lot tenders:** public sources say a UK holder has 15% of gross proceeds withheld unless the broker accepts a
@@ -268,6 +269,7 @@ small caps.
 | **Droplet control** | `deploy/on-droplet.sh "CMD" [DIR]` picks the route: SSH if this machine can, else the B2 job queue | see *Reaching the droplet* below |
 | **Keys** | `.env.example` lists every key and where it lives | cloud sessions: environment network secrets (B2, OpenAI, Vercel) injected by the proxy; droplet: `.env` files |
 | **Paper trading** | `paper/factors.py`, droplet timer `trading-rns-paper` (weekdays 22:30 UTC; acts on the first trading day of each month) | tables `paper_picks`, `paper_marks` (backed up); summary in B2 `trading-rns/paper/status.md`; setup `deploy/setup-paper.sh` |
+| **Retail-offers trial** | `paper/retail_offers.py`, droplet timer `trading-rns-retail` (weekdays 07:30 and 17:30 UK, from `/opt/trading-rns-pm`) | scans new announcements, reads retail offers with Luna, status in B2 `trading-rns/paper/retail_offers.md`; setup `deploy/setup-retail.sh`; applications are made by hand (no broker API) |
 | **Scheduled check-in** | a Claude scheduled task that checks the droplet and LLM runs every ~5 hours | re-arms itself; stop it when nothing is running |
 
 **Reaching the droplet** (it depends where the agent runs; `deploy/on-droplet.sh` tries 1 then 2)
@@ -314,6 +316,7 @@ uv run python -W ignore -m features.us_earnings build && uv run python -W ignore
 uv run python -W ignore -m backtest.us_account choose --hold 20          # final runs need --final, once
 uv run python -W ignore -m ingest.uk.announcements.run bodies --headline-re 'retail offer|primarybid|retailbook'  # droplet only
 uv run python -W ignore -m classify.uk_retail_offers run --max-gbp 3|report
+uv run python -W ignore -m paper.retail_offers status                    # live trial (droplet runs `daily`)
 uv run python -W ignore -m backtest.uk_retail_offers choose              # final needs --final, once
 uv run python -W ignore -m backtest.crypto_trend data|choose             # final needs --final, once
 uv run python -W ignore -m backtest.us_tax_loss choose                  # needs data/us_min/*.parquet (docstring)
