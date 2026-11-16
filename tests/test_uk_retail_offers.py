@@ -31,3 +31,14 @@ def test_account_caps_outstanding_applications():
                       "net_open": 0.1, "fill_open": 1.0, "bench": 0.0})
     made, idx, n = r.account(o, "open", True)
     assert n == 6 and np.isclose(made, 6 * 500 * 0.1)
+
+
+def test_alert_text_has_only_offer_facts():
+    from types import SimpleNamespace
+
+    from paper import retail_offers as p
+    r = SimpleNamespace(tidm="ABC", platform="WRAP", issue_p=10.0, discount=0.12, min_gbp=100.0, closes="2026-11-20 16:30",
+                        admission=pd.Timestamp("2026-11-27"), needs_gm=True)
+    title, body = p.alert_text(r)
+    assert title == "New retail offer: ABC"
+    assert "10p" in body and "12% below" in body and "£100" in body and "2026-11-27" in body and "shareholder vote" in body

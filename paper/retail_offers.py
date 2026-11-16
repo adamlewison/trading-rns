@@ -154,10 +154,54 @@ def status_text() -> str:
     return "\n".join(out)
 
 
+ALERTED = Path("data/paper_retail_alerted.txt")
+
+
+def alert_text(r) -> tuple[str, str]:
+    """Phone message for one new offer: public facts from the announcement only."""
+    disc = f", {r.discount:.0%} below the last close" if pd.notna(getattr(r, "discount", np.nan)) else ""
+    lines = [f"{r.platform} retail offer at {r.issue_p:g}p{disc}." if pd.notna(r.issue_p) else f"{r.platform} retail offer, price not set yet.",
+             f"Minimum: £{r.min_gbp:g}." if pd.notna(r.min_gbp) else "Minimum: not stated.",
+             f"Closes: {r.closes or 'not stated'} (brokers may close earlier).",
+             f"Admission: {r.admission.date() if pd.notna(r.admission) else 'not stated'}."]
+    if r.needs_gm == True:                                                                # noqa: E712
+        lines.append("Depends on a shareholder vote.")
+    lines.append("Trial rule: apply for the minimum, sell at the open on admission day, then report it.")
+    return f"New retail offer: {r.tidm}", "\n".join(lines)
+
+
+def alert(o: pd.DataFrame) -> int:
+    """Push a phone alert (ntfy) for each offer open to new investors that has not been alerted yet.
+    The topic name is in .env as NTFY_TOPIC; without it nothing is sent."""
+    import os
+
+    import httpx
+    from core.config import load_config
+    load_config()                                   # loads .env
+    topic = os.environ.get("NTFY_TOPIC")
+    if not topic or o.empty:
+        return 0
+    seen = set(ALERTED.read_text().split()) if ALERTED.exists() else set()
+    n = 0
+    for r in o[(o.existing_only != True) & (o.launch >= pd.Timestamp.now() - pd.Timedelta(days=4))].itertuples():   # noqa: E712
+        key = f"{r.tidm}:{r.launch:%Y-%m-%d}"
+        if key in seen:
+            continue
+        title, body = alert_text(r)
+        resp = httpx.post(f"https://ntfy.sh/{topic}", content=body.encode(), timeout=30,
+                          headers={"Title": title, "Priority": "high", "Tags": "moneybag"})
+        if resp.status_code == 200:
+            with ALERTED.open("a") as f:
+                f.write(key + "\n")
+            n += 1
+    return n
+
+
 def daily() -> None:
     from core.backup import get_store
     scan()
     label()
+    print(f"{alert(offers())} phone alerts sent", flush=True)
     text = status_text()
     get_store().put(B2_STATUS, text.encode())
     print(text)

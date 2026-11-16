@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Retail-offers live trial on the droplet: weekdays 07:30 and 17:30 UK time, `paper.retail_offers daily`
+# Retail-offers live trial on the droplet: weekdays 07:30, 17:30 and 18:45 UK time, `paper.retail_offers daily`
 # (scan recent announcements, read new retail offers, update the status in B2). Run once as root from
 # the checkout that tracks the working branch:   cd /opt/trading-rns-pm && git pull && bash deploy/setup-retail.sh
 set -euo pipefail
@@ -22,6 +22,7 @@ Description=Run the retail-offers trial scan twice each weekday
 [Timer]
 OnCalendar=Mon..Fri 07:30 Europe/London
 OnCalendar=Mon..Fri 17:30 Europe/London
+OnCalendar=Mon..Fri 18:45 Europe/London
 Persistent=true
 [Install]
 WantedBy=timers.target
