@@ -43,6 +43,7 @@ QUESTION = {"type": "predicate", "name": "yes",
             "instructions": "Based only on the information above and what you know, will this market resolve Yes?"}
 GATEWAY = "https://ai-gateway.vercel.sh/v1/decisions"
 EDGE, STAKE = 0.10, 10.0
+WORKERS = 64
 
 
 def h(s: str) -> str:
@@ -152,7 +153,7 @@ def ask(models: list[str], halves: list[str]) -> None:
             if cost[1] % 2000 == 0:
                 print(f"{cost[1]}/{len(jobs)} ${cost[0]:.3f} errors {cost[2]}", flush=True)
 
-    with ThreadPoolExecutor(16) as ex:
+    with ThreadPoolExecutor(WORKERS) as ex:      # paid tier: Vercel's own limits are lifted; 429s retry with backoff
         list(ex.map(one, jobs))
     print(f"done: {cost[1]} answers, ${cost[0]:.3f}, errors {cost[2]}")
 
