@@ -131,6 +131,9 @@ then paper trading, then small size.
     stock portfolio strays ~10% a year from the index, so over 2022 → now a ±20-point gap is one standard
     deviation of chance (quality's −22 points is that). Prefer trades with a large, structural edge per trade
     (someone forced to sell, or a prize too small for funds), judged per trade against the index over the same days.
+21. **Cheap judgement is not an edge against a price.** Decision models without web access forecast far worse than
+    a market price (they lack recent news); told the price, they copy it and add noise. Use them to read and sort
+    documents, not to second-guess markets.
 20. **Fourteen tests, no pass: predicting prices does not pay at this size; being paid for a service might.** The
     only positive numbers came from taking stock others want placed (retail offers). Look for trades where someone
     pays for liquidity, hassle or small size, and judge them live, since such edges leave no usable history.
@@ -181,6 +184,8 @@ then paper trading, then small size.
 
 | UK investment trust discounts: buy trusts whose discount is ≥ 1.5 standard deviations wider than their own last 12 months and wider than −8%, up to 5, sell when back to normal or after 6 months; NAVs read by Luna from 32,530 announcements (£3.35) | **Failed the final test.** Passed 2015–2021 (£8,764 vs £7,361 for the FTSE All-Share, 5 of 7 years, placebo 0 of 30) but 2022 → now made £5,825 vs £8,019. Discounts still narrowed (+2.5% per holding, 3.2% before), but the trusts' own assets lagged the index and ~2% of costs ate the rest: the discount edge is real, small, and swamped by what the trust holds | `backtest/DESIGN_UK_TRUST_DISCOUNTS.md` |
 
+| Decision-model forecasts vs market prices: 19 decision models (Gemini Decision 1, GPT-6 Luna Decisions, Microsoft, Liquid, Baseten, Nace, HeyGen and others, Vercel gateway) asked the probability of Kalshi events 24 hours before the end, blind or told the price | **Failed.** Choose half: all 38 combinations worse than the market (blind 20–37% worse by Brier; told the price, the best copied it). Confirm half, Liquid d1.2-Ultra told the price: 6.1% worse (interval −11.7% to −1.6%), betting rule −51% per bet. $0.28 for ~20,000 answers. Web-search models not tested | `backtest/DESIGN_DECISION_FORECASTS.md` |
+
 Every strategy whose final test ran has spent its final years: further work on them can only be judged live (paper trading)
 or with delisted prices. Open lead: the insider model's small-stock picks (worth a paper trial).
 
@@ -194,7 +199,6 @@ Each has a full plan written 2026-11-15 **before any data or result was seen**. 
 | 1 | **Odd-lot tender offers** (US): buy ≤ 99 shares below a company's own tender price and tender them | `DESIGN_ODD_LOT.md` | EDGAR SC TO-I pull; Luna < $5. **Shelved:** IBKR gave no sign it passes on a Section 302 certificate, so assume 15% of proceeds is withheld for a UK holder (detail in the design) | A prize too small for funds; capped, so it adds income but does not compound |
 | 2 | **Passive orders in wide-spread AIM shares** (IBKR API): rest a bid at the best bid, and once filled an offer at the best ask; no orders on days with company news (our RNS feed) | `DESIGN_AIM_PASSIVE.md` | **the user's answers to phase 0** (IBKR's fee for live LSE quotes, that limit orders rest on the book, willingness to keep IBKR's gateway logged in); then 4 weeks of recording quotes, trading nothing | Universe: 64 AIM shares on the SETS order book with £20k–£1m daily turnover. Be the one who is paid the 2–3% spread that sank our UK tests instead of paying it; AIM has no stamp duty; a small account is an advantage in a thin book. Risk: being filled just before bad news and left holding the shares |
 | 3 | **Betting-exchange offers and liquidity** (UK-legal, winnings untaxed): hedged bookmaker offers ("matched betting"), later resting orders in thin exchange markets | none yet | the user's own bookmaker and exchange accounts; an odds matcher we could build | Near-certain, short trades, which is what the user asked for; limited by the number of offers and by bookmakers restricting accounts, so it does not compound; not securities trading |
-| 4 | **Decision-model forecasts vs market prices**: 19 decision models (Gemini Decision 1, GPT-6 Luna Decisions, Microsoft, Liquid, Baseten, Nace, HeyGen and others, via the Vercel gateway) asked the probability of Kalshi events 24 hours before the end | `DESIGN_DECISION_FORECASTS.md`; `backtest/decision_forecasts.py` | the user's go-ahead for the one confirm run (Liquid d1.2-Ultra told the price) | **Choose half: all 38 combinations worse than the market.** Blind, 20–37% worse (Brier); told the price, the best copy it (−0.9%). $0.28 for 19,976 answers |
 | 7 | **US news drift** (deals, CEO exits, profit warnings) | none | Luna ~$140 | Only with a reason to expect a bigger effect than earnings |
 
 Ideas 2 and 3 were added 2026-11-16 after every backtest failed (lesson 20); neither can be backtested with data we have.

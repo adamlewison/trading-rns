@@ -106,3 +106,13 @@ on the choose half and on August. Market Brier score 0.190 (choose), 0.160 (Augu
 **Chosen for the confirm half:** Liquid d1.2-Ultra, told the price (highest skill, still negative). Its
 pass requires skill above zero with the interval above zero on the confirm half; given −0.9% here, a
 pass is very unlikely. The confirm run waits for the user's go-ahead.
+
+## CONFIRM-HALF RESULT (events ending 2026-11-03 → 11-15, run once, 2026-11-18, user agreed): FAILS
+Liquid d1.2-Ultra told the market price, 268 events: Brier 0.180 against 0.169 for the market, **skill
+−6.1% (95% interval −11.7% to −1.6%)**: reliably worse than the price. The trading rule placed 106 bets
+and lost 51% per bet on average (t −3.1). Worse than the market in every category with more than one
+event except Economics (4 events). The confirm half is spent.
+
+**Conclusion:** a decision model without web access cannot out-forecast a liquid market price; told the
+price, it adds only noise. The web-search decision models (Perplexity, Parallel) were not tested and
+could only be judged on open markets going forward.
