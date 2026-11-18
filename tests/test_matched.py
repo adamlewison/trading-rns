@@ -39,7 +39,7 @@ def test_pairs_matches_each_back_price_to_the_lowest_lay_for_that_outcome():
         {"key": "williamhill", "title": "William Hill", "markets": [{"key": "h2h", "outcomes": [
             {"name": "A", "price": 2.0}, {"name": "B", "price": 4.0}, {"name": "Draw", "price": 3.4}]}]},
         {"key": "betfair_ex_uk", "title": "Betfair", "markets": [
-            {"key": "h2h", "outcomes": [{"name": "A", "price": 2.0}]},
+            {"key": "h2h", "outcomes": [{"name": "A", "price": 2.0}, {"name": "Draw", "price": 3.3}]},
             {"key": "h2h_lay", "outcomes": [{"name": "A", "price": 2.02}, {"name": "B", "price": 4.3}]}]},
         {"key": "smarkets", "title": "Smarkets", "markets": [
             {"key": "h2h_lay", "outcomes": [{"name": "A", "price": 2.06}]}]}]}]
@@ -82,3 +82,17 @@ def test_choices_are_sent_as_objects():
     from matched import terms
     q = terms._wire({"type": "choice", "name": "x", "instructions": "?", "choices": ["a", "b"]})
     assert q["choices"] == [{"value": "a"}, {"value": "b"}]
+
+
+def test_three_way_bookmaker_price_is_not_matched_to_a_two_way_exchange_market():
+    from datetime import datetime, timedelta, timezone
+
+    from matched import scan
+    soon = (datetime.now(timezone.utc) + timedelta(hours=5)).isoformat().replace("+00:00", "Z")
+    ev = [{"commence_time": soon, "home_team": "A", "away_team": "B", "sport_key": "icehockey_nhl", "bookmakers": [
+        {"key": "unibet_uk", "title": "Unibet", "markets": [{"key": "h2h", "outcomes": [
+            {"name": "A", "price": 2.5}, {"name": "B", "price": 2.6}, {"name": "Draw", "price": 4.2}]}]},
+        {"key": "betfair_ex_uk", "title": "Betfair", "markets": [
+            {"key": "h2h", "outcomes": [{"name": "A", "price": 1.98}, {"name": "B", "price": 1.98}]},
+            {"key": "h2h_lay", "outcomes": [{"name": "A", "price": 2.0}, {"name": "B", "price": 2.0}]}]}]}]
+    assert scan.pairs(ev, 10, 10, 1.01, 50, None, 72).empty

@@ -58,9 +58,15 @@ def pairs(events: list, stake: float, free: float, min_odds: float, max_odds: fl
             continue
         lays: dict[str, tuple[float, str, float]] = {}
         backs: list[tuple[str, str, float]] = []
+        book_names: dict[str, set] = {}             # outcomes each bookmaker prices (2-way vs 3-way markets)
+        ex_names: set = set()
         for bk in ev["bookmakers"]:
             for mk in bk["markets"]:
                 for o in mk["outcomes"]:
+                    if mk["key"] == "h2h" and bk["key"] in EXCHANGES:
+                        ex_names.add(o["name"])
+                    if mk["key"] == "h2h" and bk["key"] not in EXCHANGES:
+                        book_names.setdefault(bk["title"], set()).add(o["name"])
                     if mk["key"] == "h2h_lay" and bk["key"] in EXCHANGES:
                         c = EXCHANGES[bk["key"]]
                         if o["name"] not in lays or o["price"] < lays[o["name"]][0]:
@@ -70,6 +76,9 @@ def pairs(events: list, stake: float, free: float, min_odds: float, max_odds: fl
                             backs.append((bk["title"], o["name"], o["price"]))
         for book, name, back in backs:
             if name not in lays or not min_odds <= back <= max_odds:
+                continue
+            # different bets: e.g. a 60-minute 3-way hockey price (with a draw) against the exchange's 2-way price
+            if ex_names and (("Draw" in book_names.get(book, set())) != ("Draw" in ex_names)):
                 continue
             lay, ex, c = lays[name]
             q = calc.qualifying(stake, back, lay, c)
