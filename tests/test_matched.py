@@ -56,3 +56,29 @@ def test_ledger_adds_and_sums(tmp_path, monkeypatch):
     ledger.add("WH", "Bet 10 get 10", "qualifying", -0.36, when="2026-11-18")
     ledger.add("WH", "10 free", "free", 7.8, when="2026-11-19")
     assert "Total profit: £7.44 from 2 bets" in ledger.summary()
+
+
+def _answers(**kw):
+    a = {"reward": ("sports free bets (stake not returned)", 0.99), "wagering": ("no wagering: winnings are withdrawable cash", 0.99),
+         "min_odds": ("evens (2.0)", 0.98), "balance_lock": 0.02, "restricted_markets": 0.02, "short_expiry": 0.02,
+         "ewallet_excluded": 0.99, "casino_required": 0.01, "split": 0.9}
+    a.update(kw)
+    return a
+
+
+def test_terms_verdict_rules():
+    from matched import terms
+    v, why = terms.verdict(_answers())
+    assert v == "GOOD" and all(w.startswith("note") for w in why)          # notes never downgrade
+    assert terms.verdict(_answers(wagering=("more than 10x", 0.99)))[0] == "AVOID"
+    assert terms.verdict(_answers(wagering=("1x", 0.9)))[0] == "GOOD"      # 1x on sports free bets is harmless
+    assert terms.verdict(_answers(balance_lock=0.8))[0] == "AVOID"
+    assert terms.verdict(_answers(reward=("casino spins or casino bonus", 0.9)))[0] == "AVOID"
+    assert terms.verdict(_answers(short_expiry=0.9))[0] == "CAUTION"
+    assert terms.verdict(_answers(wagering=("not stated", 0.5)))[0] == "CAUTION"
+
+
+def test_choices_are_sent_as_objects():
+    from matched import terms
+    q = terms._wire({"type": "choice", "name": "x", "instructions": "?", "choices": ["a", "b"]})
+    assert q["choices"] == [{"value": "a"}, {"value": "b"}]

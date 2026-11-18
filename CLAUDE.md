@@ -337,6 +337,7 @@ uv run python -W ignore -m features.uk_trusts prices|build|report         # trus
 uv run python -W ignore -m backtest.uk_trust_discounts choose           # final needs --final, once
 uv run python -W ignore -m matched.scan [--book williamhill] [--stake 10 --free 10]   # matched betting: best back/lay pairs (Odds API key = network secret, 500 credits/month)
 uv run python -W ignore -m matched.ledger add ...|summary                # private record of offers done
+uv run python -W ignore -m matched.terms terms.txt                      # screen an offer's terms (decision model): GOOD / CAUTION / AVOID
 uv run python -W ignore -m paper.retail_offers status                    # live trial (droplet runs `daily`)
 uv run python -W ignore -m backtest.uk_retail_offers choose              # final needs --final, once
 uv run python -W ignore -m backtest.crypto_trend data|choose             # final needs --final, once
