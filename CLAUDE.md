@@ -59,7 +59,7 @@ then paper trading, then small size.
 - **The user's account:** about $6,000, around $150 per trade, Trading 212 (IBKR opened 2026-11-15), holds up to ~20 days.
 - **The user's preference (2026-11-15):** short trades (hours to days) whose gains are reinvested (lesson 17).
 - **The user's preference (2026-11-18):** not interested in one-off gains of a few hundred pounds (bookmaker sign-up offers);
-  wants something that keeps paying. Matched-betting tool kept for reference; a 2026-11-18 scan of 312 events found no true
+  wants something that keeps paying (Betfair exchange test run 2026-11-18: failed). Matched-betting tool kept for reference; a 2026-11-18 scan of 312 events found no true
   bookmaker-vs-exchange arbitrage once 3-way hockey prices were excluded.
 - **State 2026-11-16** (plans in section 7, procedure in `backtest/RUNBOOK.md`): tax-loss rebound and crypto trend
   have failed (section 6). **UK retail offers:** both periods run, too small to judge (section 6); a **live trial started
@@ -188,6 +188,8 @@ then paper trading, then small size.
 | UK investment trust discounts: buy trusts whose discount is ≥ 1.5 standard deviations wider than their own last 12 months and wider than −8%, up to 5, sell when back to normal or after 6 months; NAVs read by Luna from 32,530 announcements (£3.35) | **Failed the final test.** Passed 2015–2021 (£8,764 vs £7,361 for the FTSE All-Share, 5 of 7 years, placebo 0 of 30) but 2022 → now made £5,825 vs £8,019. Discounts still narrowed (+2.5% per holding, 3.2% before), but the trusts' own assets lagged the index and ~2% of costs ate the rest: the discount edge is real, small, and swamped by what the trust holds | `backtest/DESIGN_UK_TRUST_DISCOUNTS.md` |
 
 | Decision-model forecasts vs market prices: 19 decision models (Gemini Decision 1, GPT-6 Luna Decisions, Microsoft, Liquid, Baseten, Nace, HeyGen and others, Vercel gateway) asked the probability of Kalshi events 24 hours before the end, blind or told the price | **Failed.** Choose half: all 38 combinations worse than the market (blind 20–37% worse by Brier; told the price, the best copied it). Confirm half, Liquid d1.2-Ultra told the price: 6.1% worse (interval −11.7% to −1.6%), betting rule −51% per bet. $0.28 for ~20,000 answers. Web-search models not tested | `backtest/DESIGN_DECISION_FORECASTS.md` |
+
+| Betfair Exchange racing, Aus & NZ (Betfair's free files, 2020 → Oct 2026): back favourites or lay longshots at BSP; back or lay the place market using a Harville model from win prices at the off | **Failed on 2020–2023** (final years unused): favourites −2.8% per £ after 5% commission; laying longshots +0.27% per £ of liability (t 1.7, 4 of 4 years: a real but tiny favourite–longshot bias); place-market bets −1.9% to −9.6%. Place BSPs were almost perfectly calibrated and better than the model. Tick-level ideas untested (need paid data or a live recording) | `backtest/DESIGN_BETFAIR_RACING.md` |
 
 Every strategy whose final test ran has spent its final years: further work on them can only be judged live (paper trading)
 or with delisted prices. Open lead: the insider model's small-stock picks (worth a paper trial).
@@ -341,6 +343,7 @@ uv run python -W ignore -m backtest.uk_trust_discounts choose           # final 
 uv run python -W ignore -m matched.scan [--book williamhill] [--stake 10 --free 10]   # matched betting: best back/lay pairs (Odds API key = network secret, 500 credits/month)
 uv run python -W ignore -m matched.ledger add ...|summary                # private record of offers done
 uv run python -W ignore -m matched.terms terms.txt                      # screen an offer's terms (decision model): GOOD / CAUTION / AVOID
+uv run python -W ignore -m backtest.betfair_racing choose                # Aus & NZ racing at BSP (data in data/betfair/, free from Betfair's data hub)
 uv run python -W ignore -m paper.retail_offers status                    # live trial (droplet runs `daily`)
 uv run python -W ignore -m backtest.uk_retail_offers choose              # final needs --final, once
 uv run python -W ignore -m backtest.crypto_trend data|choose             # final needs --final, once

@@ -60,3 +60,26 @@ Choose: 2020–2023. Final: 2024 → October 2026, **once**, one variant frozen.
   so this only affects the signal, not the fill.
 - Favourite–longshot bias at the exchange is well documented and small; commission may remove it.
 - Trap: using `WIN_BSP`, `PLACE_BSP` or results to choose bets. Trap: counting places from results.
+
+## Changes
+- 2026-11-18 (before any result): some files write the meeting date day-first ("1/04/2025"); both formats are read.
+
+## Choose-period result (2020–2023, run 2026-11-18): FAILED, every variant
+77,576 races, 761,727 runners; 648,818 with a price at the scheduled off. Final years (2024 →) not run.
+
+| Variant | Bets | Hit rate | Mean return per £, 5% commission (t) | Years positive | At 8% commission |
+|---|---|---|---|---|---|
+| A1 back favourites (mid ≤ 2.5) at win BSP | 18,845 | 50.3% | −2.8% (−3.9) | 0 of 4 | −4.3% |
+| A2 lay longshots (mid 50–200) at win BSP, per £ of liability | 5,572 | 1.4% won | **+0.27% (1.7)** | 4 of 4 | +0.22% |
+| B1 back place, Harville ≥ 0.5 and win mid ≥ 4 | 42,437 | 53.8% | −2.9% (−7.1) | 0 of 4 | −4.3% |
+| B2 lay place, Harville ≤ 0.15 and win mid ≤ 15 | 80 | 31.3% placed | −9.6% (−1.4) | 1 of 4 | −10.3% |
+| B4 back place where Harville ≥ naive + 0.10 | 14,810 | 45.7% | −1.9% (−2.5) | 0 of 4 | −3.5% |
+
+- **A2 is the only positive one and it fails the pass rule** (t 1.7, 3 required): laying longshots earns
+  about 0.27p per £1 risked, every year, which confirms a favourite–longshot bias exists at the exchange
+  but at a size commission almost erases. On £10 of liability per bet, 5,572 bets over four years made about £150.
+- **The place market is better than the model.** B3 diagnostic: place BSPs are almost exactly calibrated
+  (implied 5.4% → 4.9% placed, 25% → 25%, 55% → 55%, 75% → 75%), while Harville overstates favourites'
+  place chances and understates longshots'. Betting the model against the market loses.
+- Untested here: anything needing second-by-second prices (in-running trading, making markets), which
+  needs Betfair's paid historical data or a live recording through the API with the user's account.
