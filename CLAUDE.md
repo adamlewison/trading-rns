@@ -58,6 +58,9 @@ then paper trading, then small size.
   B2 `trading-rns/paper/status.md`. Judge after ≥ 12 months; no picking a winner early.
 - **The user's account:** about $6,000, around $150 per trade, Trading 212 (IBKR opened 2026-11-15), holds up to ~20 days.
 - **The user's preference (2026-11-15):** short trades (hours to days) whose gains are reinvested (lesson 17).
+- **The user's preference (2026-11-18):** not interested in one-off gains of a few hundred pounds (bookmaker sign-up offers);
+  wants something that keeps paying. Matched-betting tool kept for reference; a 2026-11-18 scan of 312 events found no true
+  bookmaker-vs-exchange arbitrage once 3-way hockey prices were excluded.
 - **State 2026-11-16** (plans in section 7, procedure in `backtest/RUNBOOK.md`): tax-loss rebound and crypto trend
   have failed (section 6). **UK retail offers:** both periods run, too small to judge (section 6); a **live trial started
   2026-11-16** (the user applies by hand for the minimum in every offer open to new investors and reports it; an agent
