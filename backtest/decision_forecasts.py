@@ -25,7 +25,7 @@ import numpy as np
 import pandas as pd
 
 from backtest.pm_favourites import fee, tstat
-from ingest.pm.kalshi import Client, ts
+from ingest.pm.kalshi import Client, batches, ts
 
 D = Path("data/decisions")
 MARKETS = "data/pm/kalshi/markets/*.jsonl.gz"
@@ -71,32 +71,53 @@ def sample() -> None:
     ev["end"] = ev.sched.map(lambda s: ts(str(s)))
     ev["t_snap"] = ev.end - LEAD_S
     cl = Client()
-    lock = threading.Lock()
-    out = {}
-
-    def one(r):
+    # rules text: up to 100 markets per request (live tier first, then the historical tier)
+    rules: dict[str, str] = {}
+    tick = list(ev.ticker)
+    for k in range(0, len(tick), 100):
+        chunk = tick[k:k + 100]
+        for path in ("/markets", "/historical/markets"):
+            todo = [t for t in chunk if t not in rules]
+            if not todo:
+                break
+            for m in (cl.get(path, {"tickers": ",".join(todo), "limit": 100}) or {}).get("markets", []):
+                rules[m["ticker"]] = (m.get("rules_primary") or "")[:1500]
+        print(f"rules {len(rules)}/{len(tick)} ({cl.n} requests, {cl.n429} x 429)", flush=True)
+    ev["rules"] = ev.ticker.map(rules).fillna("")
+    # candles: 40 recent markets per request, one at a time from the historical tier for the rest
+    candles: dict[str, list] = {}
+    win = {"period_interval": 60}
+    for b in batches([(r.ticker, r.series, r.t_snap) for r in ev.itertuples()], size=40):
+        ends = {t: e for t, _, e in b}
+        d = cl.get("/markets/candlesticks", {**win, "market_tickers": ",".join(ends),
+                                              "start_ts": int(min(ends.values()) - 3 * 86400),
+                                              "end_ts": int(max(ends.values()) + 1)}) or {}
+        for m in d.get("markets", []):
+            if m.get("candlesticks"):
+                candles[m["market_ticker"]] = m["candlesticks"]
+    print(f"candles by batch: {len(candles)}/{len(ev)} ({cl.n} requests, {cl.n429} x 429)", flush=True)
+    for n, r in enumerate(ev[~ev.ticker.isin(candles)].itertuples(), 1):
         enc = quote(r.ticker, safe="")
-        info = cl.get(f"/markets/{enc}") or cl.get(f"/historical/markets/{enc}") or {}
-        rules = ((info.get("market") or {}).get("rules_primary") or "")[:1500]
-        p = {"start_ts": int(r.t_snap - 3 * 86400), "end_ts": int(r.t_snap + 1), "period_interval": 60}
-        c = (cl.get(f"/series/{r.series}/markets/{enc}/candlesticks", p)
-             or cl.get(f"/historical/markets/{enc}/candlesticks", p) or {}).get("candlesticks", [])
+        d = cl.get(f"/historical/markets/{enc}/candlesticks",
+                   {**win, "start_ts": int(r.t_snap - 3 * 86400), "end_ts": int(r.t_snap + 1)}) or {}
+        candles[r.ticker] = d.get("candlesticks", [])
+        if n % 100 == 0:
+            print(f"single candles {n} ({cl.n} requests, {cl.n429} x 429)", flush=True)
+    snaps = {}
+    for r in ev.itertuples():
         snap = None
-        for x in sorted(c, key=lambda x: x["end_period_ts"]):
+        for x in sorted(candles.get(r.ticker, []), key=lambda x: x["end_period_ts"]):
             a, bb = x.get("yes_ask") or {}, x.get("yes_bid") or {}
             ask, bid = a.get("close_dollars", a.get("close")), bb.get("close_dollars", bb.get("close"))
-            if x["end_period_ts"] <= r.t_snap and ask is not None and bid is not None:
-                ask, bid = float(ask), float(bid)
-                if 0 < bid <= ask < 1 and ask - bid <= MAX_GAP + 1e-9:
-                    snap = (x["end_period_ts"], bid, ask)
-                elif 0 <= bid <= ask <= 1:
-                    snap = None                                # the latest usable candle must be the last one
-        with lock:
-            out[r.ticker] = {"rules": rules, "snap_t": snap and snap[0], "bid": snap and snap[1], "ask": snap and snap[2]}
-
-    with ThreadPoolExecutor(4) as ex:
-        list(ex.map(one, ev.itertuples()))
-    ev = ev.join(pd.DataFrame.from_dict(out, orient="index"), on="ticker")
+            if x["end_period_ts"] > r.t_snap or ask is None or bid is None:
+                continue
+            ask, bid = float(ask), float(bid)
+            # the last candle with both sides quoted decides: kept only if its gap is at most 10c
+            snap = (x["end_period_ts"], bid, ask) if 0 < bid <= ask < 1 and ask - bid <= MAX_GAP + 1e-9 else None
+        snaps[r.ticker] = snap
+    ev["snap_t"] = ev.ticker.map(lambda t: snaps[t] and snaps[t][0])
+    ev["bid"] = ev.ticker.map(lambda t: snaps[t] and snaps[t][1])
+    ev["ask"] = ev.ticker.map(lambda t: snaps[t] and snaps[t][2])
     print(ev.groupby("half").agg(events=("ticker", "size"), with_rules=("rules", lambda s: (s.str.len() > 0).sum()),
                                  with_snapshot=("bid", lambda s: s.notna().sum())).to_string())
     ev.to_parquet(D / "events.parquet")
