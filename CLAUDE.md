@@ -198,7 +198,7 @@ Each has a full plan written 2026-11-15 **before any data or result was seen**. 
 |---|---|---|---|---|
 | 1 | **Odd-lot tender offers** (US): buy ≤ 99 shares below a company's own tender price and tender them | `DESIGN_ODD_LOT.md` | EDGAR SC TO-I pull; Luna < $5. **Shelved:** IBKR gave no sign it passes on a Section 302 certificate, so assume 15% of proceeds is withheld for a UK holder (detail in the design) | A prize too small for funds; capped, so it adds income but does not compound |
 | 2 | **Passive orders in wide-spread AIM shares** (IBKR API): rest a bid at the best bid, and once filled an offer at the best ask; no orders on days with company news (our RNS feed) | `DESIGN_AIM_PASSIVE.md` | **the user's answers to phase 0** (IBKR's fee for live LSE quotes, that limit orders rest on the book, willingness to keep IBKR's gateway logged in); then 4 weeks of recording quotes, trading nothing | Universe: 64 AIM shares on the SETS order book with £20k–£1m daily turnover. Be the one who is paid the 2–3% spread that sank our UK tests instead of paying it; AIM has no stamp duty; a small account is an advantage in a thin book. Risk: being filled just before bad news and left holding the shares |
-| 3 | **Betting-exchange offers and liquidity** (UK-legal, winnings untaxed): hedged bookmaker offers ("matched betting"), later resting orders in thin exchange markets | none yet | the user's own bookmaker and exchange accounts; an odds matcher we could build | Near-certain, short trades, which is what the user asked for; limited by the number of offers and by bookmakers restricting accounts, so it does not compound; not securities trading |
+| 3 | **Betting-exchange offers and liquidity** (UK-legal, winnings untaxed): hedged bookmaker offers ("matched betting"), later resting orders in thin exchange markets | none yet | **built 2026-11-18:** `matched/` (hedge calculator, oddsmatcher on The Odds API, private ledger in `data/matched_ledger.csv`); needs only the user's bookmaker and exchange accounts | Near-certain, short trades, which is what the user asked for; limited by the number of offers and by bookmakers restricting accounts, so it does not compound; not securities trading |
 | 7 | **US news drift** (deals, CEO exits, profit warnings) | none | Luna ~$140 | Only with a reason to expect a bigger effect than earnings |
 
 Ideas 2 and 3 were added 2026-11-16 after every backtest failed (lesson 20); neither can be backtested with data we have.
@@ -335,6 +335,8 @@ uv run python -W ignore -m classify.uk_retail_offers run --max-gbp 3|report
 uv run python -W ignore -m classify.uk_nav run --max-gbp 5|report         # trust NAVs (done: data/labels/uk_nav.jsonl, B2)
 uv run python -W ignore -m features.uk_trusts prices|build|report         # trust prices (splits undone), monthly discounts, step 0
 uv run python -W ignore -m backtest.uk_trust_discounts choose           # final needs --final, once
+uv run python -W ignore -m matched.scan [--book williamhill] [--stake 10 --free 10]   # matched betting: best back/lay pairs (Odds API key = network secret, 500 credits/month)
+uv run python -W ignore -m matched.ledger add ...|summary                # private record of offers done
 uv run python -W ignore -m paper.retail_offers status                    # live trial (droplet runs `daily`)
 uv run python -W ignore -m backtest.uk_retail_offers choose              # final needs --final, once
 uv run python -W ignore -m backtest.crypto_trend data|choose             # final needs --final, once
