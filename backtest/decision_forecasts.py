@@ -36,7 +36,9 @@ MIN_VOLUME, MAX_GAP, LEAD_S = 1000.0, 0.10, 24 * 3600
 MODELS = ["baseten/elephant-1", "baseten/joey-1", "baseten/mammoth-1", "convaiinnovations/laya",
           "heygen/heygen-decision-1", "heygen/heygen-decision-1-turbo", "liquid/d1-ultra", "liquid/d1.2",
           "liquid/d1.2-ultra", "microsoft/decision-1.1", "nace-ai/drex-max-finance", "nace-ai/drex-max-v1.1",
-          "nace-ai/drex-v2.0", "scaledown/scaledown-classify-1"]
+          "nace-ai/drex-v2.0", "scaledown/scaledown-classify-1",
+          "google/gemini-decision-1", "openai/gpt-6-luna-decisions", "microsoft/microsoft-decision-1",
+          "liquid/d1", "typesafe-ai/jev-1.14.0"]
 QUESTION = {"type": "predicate", "name": "yes",
             "instructions": "Based only on the information above and what you know, will this market resolve Yes?"}
 GATEWAY = "https://ai-gateway.vercel.sh/v1/decisions"

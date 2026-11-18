@@ -65,3 +65,8 @@ web-search models, and then to UK-legal venues (Betfair, Smarkets). Kalshi itsel
   and a model without web access cannot; results are reported by category, but the verdict uses all.
 - ⚠️ Mode M can only beat the market by disagreeing with it; a model that copies the price scores skill ≈ 0.
 - Trap: using `close_time` or `settlement_ts` for T (they leak early closes). Use the scheduled end.
+
+## Changes
+- 2026-11-18, before any model answer was collected: the user added paid credits, so the five paid
+  models (Gemini Decision 1, GPT-6 Luna Decisions, Microsoft Decision-1, Liquid d1, Jev 1.14) join the
+  test under the same rules: 19 models, 38 model-and-mode combinations on the choose half.
