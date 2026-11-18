@@ -29,8 +29,8 @@ from ingest.pm.kalshi import Client, ts
 
 D = Path("data/decisions")
 MARKETS = "data/pm/kalshi/markets/*.jsonl.gz"
-HALVES = {"choose": ("2026-10-20", "2026-11-02 23:59:59"), "confirm": ("2026-11-03", "2026-11-15 23:59:59"),
-          "august": ("2026-08-01", "2026-08-31 23:59:59")}
+HALVES = {"choose": ("2026-10-20 00:00:00", "2026-11-02 23:59:59"), "confirm": ("2026-11-03 00:00:00", "2026-11-15 23:59:59"),
+          "august": ("2026-08-01 00:00:00", "2026-08-31 23:59:59")}
 N_EVENTS = {"choose": 1000, "confirm": 1000, "august": 500}
 MIN_VOLUME, MAX_GAP, LEAD_S = 1000.0, 0.10, 24 * 3600
 MODELS = ["baseten/elephant-1", "baseten/joey-1", "baseten/mammoth-1", "convaiinnovations/laya",
