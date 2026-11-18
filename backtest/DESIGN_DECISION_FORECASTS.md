@@ -78,3 +78,31 @@ web-search models, and then to UK-legal venues (Betfair, Smarkets). Kalshi itsel
   Elections, Entertainment, Science and Technology, Mentions, Financials: about 650 events in the choose
   half), the rest from Sports, Weather, Crypto and Commodities, each by hash. Results are still
   reported by category; the verdict uses all events.
+
+## Choose-half result (run 2026-11-18): no model beats the market
+Usable events (a quoted price with a gap of at most 10c, 24 hours before the scheduled end): choose 356
+of 1,000 (242 sports), August 169 of 500. 19,976 answers cost $0.28 in total.
+
+**Every one of the 38 model-and-mode combinations scored worse than the market price** (negative skill),
+on the choose half and on August. Market Brier score 0.190 (choose), 0.160 (August).
+
+| Best five, choose half | Mode | Brier | Skill vs market (95% interval) | Correlation with market |
+|---|---|---|---|---|
+| Liquid d1.2-Ultra | told the price | 0.192 | −0.9% (−6.1% to +2.6%) | 0.98 |
+| Baseten Mammoth-1 | told the price | 0.192 | −1.1% (−5.7% to +2.2%) | 0.96 |
+| GPT-6 Luna Decisions | told the price | 0.200 | −4.8% (−10.0% to −0.7%) | 0.94 |
+| Microsoft Decision-1.1 | told the price | 0.201 | −5.8% | 0.94 |
+| Nace Drex Max Finance | told the price | 0.203 | −6.7% | 0.97 |
+
+- **Blind (not told the price), every model was 20–37% worse than the market**; Gemini Decision 1 −28%,
+  GPT-6 Luna Decisions −31%. Their forecasts correlate only 0.4–0.6 with the price.
+- **Told the price, the best models mostly repeat it** (correlation 0.96–0.98) and lose a little where they
+  move away from it. A model that disagrees with the market is, on average, wrong.
+- Convai Laya and ScaleDown Classify-1 gave answers unrelated to the question (correlation with the market near zero).
+- The trading rule's mean returns are noise (t below 1.3 for every model with a positive mean; it bets
+  mostly on cheap long shots, a few of which won).
+- Hindsight check: no model did better on August than on the choose half, so no sign they knew outcomes.
+
+**Chosen for the confirm half:** Liquid d1.2-Ultra, told the price (highest skill, still negative). Its
+pass requires skill above zero with the interval above zero on the confirm half; given −0.9% here, a
+pass is very unlikely. The confirm run waits for the user's go-ahead.
