@@ -70,3 +70,11 @@ web-search models, and then to UK-legal venues (Betfair, Smarkets). Kalshi itsel
 - 2026-11-18, before any model answer was collected: the user added paid credits, so the five paid
   models (Gemini Decision 1, GPT-6 Luna Decisions, Microsoft Decision-1, Liquid d1, Jev 1.14) join the
   test under the same rules: 19 models, 38 model-and-mode combinations on the choose half.
+- 2026-11-18, after the first download and **on counts only** (no model answer, no outcome looked at):
+  only 235 of 1,000 choose-half events had a price 24 hours before the end, 96% of them sports. Most
+  Kalshi markets live for 15 minutes to a day (crypto and commodity "up in the next 15 minutes",
+  same-day sports) and did not exist at the snapshot. New sample: markets **open at least 2 days before
+  the scheduled end**; up to 70% of each half from the judgement categories (Economics, Politics,
+  Elections, Entertainment, Science and Technology, Mentions, Financials: about 650 events in the choose
+  half), the rest from Sports, Weather, Crypto and Commodities, each by hash. Results are still
+  reported by category; the verdict uses all events.

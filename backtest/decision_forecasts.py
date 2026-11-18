@@ -33,6 +33,9 @@ HALVES = {"choose": ("2026-10-20 00:00:00", "2026-11-02 23:59:59"), "confirm": (
           "august": ("2026-08-01 00:00:00", "2026-08-31 23:59:59")}
 N_EVENTS = {"choose": 1000, "confirm": 1000, "august": 500}
 MIN_VOLUME, MAX_GAP, LEAD_S = 1000.0, 0.10, 24 * 3600
+MIN_OPEN_DAYS = 2                      # change 2026-11-18: the market must exist well before the snapshot
+NUMERIC_CATS = ["Sports", "Crypto", "Commodities", "Climate and Weather"]   # live-data markets: filled after the rest
+MAX_JUDGEMENT_SHARE = 0.7
 MODELS = ["baseten/elephant-1", "baseten/joey-1", "baseten/mammoth-1", "convaiinnovations/laya",
           "heygen/heygen-decision-1", "heygen/heygen-decision-1-turbo", "liquid/d1-ultra", "liquid/d1.2",
           "liquid/d1.2-ultra", "microsoft/decision-1.1", "nace-ai/drex-max-finance", "nace-ai/drex-max-v1.1",
@@ -55,19 +58,25 @@ def sample() -> None:
     D.mkdir(parents=True, exist_ok=True)
     con = duckdb.connect()
     con.execute(f"""CREATE TABLE m AS SELECT DISTINCT ON (ticker) ticker, event_ticker, series, title, result,
-        CAST(volume_fp AS DOUBLE) volume, coalesce(expected_expiration_time, latest_expiration_time) AS sched
+        CAST(volume_fp AS DOUBLE) volume, coalesce(expected_expiration_time, latest_expiration_time) AS sched,
+        CAST(open_time AS TIMESTAMPTZ) AS opened
         FROM read_json_auto('{MARKETS}', union_by_name=true, sample_size=-1)
         WHERE market_type='binary' AND result IN ('yes','no') AND CAST(volume_fp AS DOUBLE) >= {MIN_VOLUME}
           AND NOT starts_with(ticker, 'KXMVE')""")
     cats = pd.DataFrame(json.loads(Path("data/pm/kalshi/series.json").read_text()))[["series", "category"]]
     rows = []
     for half, (a, b) in HALVES.items():
-        d = con.execute(f"SELECT * FROM m WHERE CAST(sched AS TIMESTAMPTZ) BETWEEN TIMESTAMPTZ '{a}+00' AND TIMESTAMPTZ '{b}+00'").df()
+        d = con.execute(f"""SELECT * FROM m WHERE CAST(sched AS TIMESTAMPTZ) BETWEEN TIMESTAMPTZ '{a}+00' AND TIMESTAMPTZ '{b}+00'
+            AND opened <= CAST(sched AS TIMESTAMPTZ) - INTERVAL {MIN_OPEN_DAYS} DAY""").df().merge(cats, on="series", how="left")
         d["k"] = d.ticker.map(h)
         d = d.sort_values("k").drop_duplicates("event_ticker")          # one market per event, chosen by hash
         d["ek"] = d.event_ticker.map(h)
-        rows.append(d.sort_values("ek").head(N_EVENTS[half]).assign(half=half))
-    ev = pd.concat(rows, ignore_index=True).merge(cats, on="series", how="left")
+        d = d.sort_values("ek")
+        n = N_EVENTS[half]
+        other = d[~d.category.isin(NUMERIC_CATS)].head(int(n * MAX_JUDGEMENT_SHARE))   # judgement events first
+        rest = d[d.category.isin(NUMERIC_CATS)].head(n - len(other))
+        rows.append(pd.concat([other, rest]).assign(half=half))
+    ev = pd.concat(rows, ignore_index=True)
     ev["end"] = ev.sched.map(lambda s: ts(str(s)))
     ev["t_snap"] = ev.end - LEAD_S
     cl = Client()
