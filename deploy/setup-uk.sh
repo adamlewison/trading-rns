@@ -7,7 +7,7 @@
 #   * Backblaze B2 key ID + application key (ideally restricted to the backup bucket)
 set -euo pipefail
 REPO=adamlewison/trading-rns
-BRANCH=claude/uk-smallcap-rns-drift-i83n19
+BRANCH=main
 DIR=/opt/trading-rns
 export PATH="/root/.local/bin:$PATH"
 

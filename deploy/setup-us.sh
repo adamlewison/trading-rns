@@ -2,14 +2,14 @@
 # One-time setup of the US (SEC EDGAR) download on the droplet. Mirrors deploy/setup-uk.sh. Run as root:
 #     bash /opt/trading-rns/deploy/setup-us.sh
 # or, without updating the UK checkout (e.g. while the UK scrape is running):
-#     git -C /opt/trading-rns fetch -q && git -C /opt/trading-rns show origin/claude/uk-smallcap-rns-drift-i83n19:deploy/setup-us.sh > /root/setup-us.sh && bash /root/setup-us.sh
+#     git -C /opt/trading-rns fetch -q && git -C /opt/trading-rns show origin/main:deploy/setup-us.sh > /root/setup-us.sh && bash /root/setup-us.sh
 # Uses a SEPARATE checkout + data folder so it never touches the running UK scrape or its DB.
 # If a DigitalOcean volume is attached it is formatted (only if blank) and mounted, and the US
 # data lives there.
 set -euo pipefail
 export PATH="/root/.local/bin:$PATH"
 UK=/opt/trading-rns
-BRANCH=claude/uk-smallcap-rns-drift-i83n19
+BRANCH=main
 
 VOL=$(ls /dev/disk/by-id/scsi-0DO_Volume_* 2>/dev/null | head -1 || true)
 if [ -n "$VOL" ]; then
