@@ -71,6 +71,11 @@ then paper trading, then small size.
   **Odd-lot tenders:** public sources say a UK holder has 15% of gross proceeds withheld unless the broker accepts a
   Section 302 certificate; IBKR's AI assistant (2026-11-16) did not say it passes one on, so assume withholding applies: the track is
   shelved unless IBKR's corporate-actions desk confirms otherwise in writing.
+- **Collecting data that isn't kept as history (started 2026-11-22, user's choice):** daily option chains (S&P 500,
+  nearest 4 expiries, ±25% strikes), Yahoo analyst forecasts/revisions/earnings dates (S&P 1500), IBKR borrow fees
+  (US + UK, 4× a day), Nasdaq listings + S&P 500/400/600 holdings + prices of every listed US stock (survivorship-free
+  from now). `collect/run.py`, droplet timers `trading-rns-collect-*`; worth testing on after ~2 years. Status B2
+  `trading-rns/collect/status.md`. Not yet: UK quotes/spreads (wait for IBKR live data), exchange order books.
 - Droplet runner (`trading-rns-agent`) installed 2026-11-12: agents reach the droplet themselves (~6s a command).
 - US Luna leftovers: 150,457 of 150,518 labelled; 13 small batches still at OpenAI (`luna-run` on the droplet). When done: `classify.labels build`, then `features.us_earnings_labels build`.
 
@@ -294,6 +299,7 @@ small caps.
 | **Keys** | `.env.example` lists every key and where it lives | cloud sessions: environment network secrets (B2, OpenAI, Vercel) injected by the proxy; droplet: `.env` files |
 | **Paper trading** | `paper/factors.py`, droplet timer `trading-rns-paper` (weekdays 22:30 UTC; acts on the first trading day of each month) | tables `paper_picks`, `paper_marks` (backed up); summary in B2 `trading-rns/paper/status.md`; setup `deploy/setup-paper.sh` |
 | **T212 practice orders** | `paper/t212.py`, called by `paper.factors daily` when `T212_API_KEY` is set | practice host only; `check` tests the key and ticker coverage; tables `t212_*` (backed up) |
+| **Data collection** | `collect/run.py`, droplet timers `trading-rns-collect-<job>` (UTC weekdays: borrow 08:05/13:05/17:05/20:35, options 19:40, prices 21:40, analysts 23:10, listings 23:55 Mon–Sat), from `/opt/trading-rns-us` | files `data/collect/<job>/<date>.*`, each uploaded to B2 `trading-rns/collect/v1/<job>/`; never deleted; setup `deploy/setup-collect.sh`; sources: Yahoo (options, analysts, prices), IBKR `ftp2` (borrow; `ftp3` unreachable), nasdaqtrader.com, ssga.com |
 | **Retail-offers trial** | `paper/retail_offers.py`, droplet timer `trading-rns-retail` (weekdays, from `/opt/trading-rns-pm`) | scans new announcements (07:30, 17:30, 18:45 UK), reads retail offers with Luna, sends a phone alert through ntfy for each new offer open to new investors (topic name in the droplet's `/opt/trading-rns-pm/.env` as `NTFY_TOPIC`, never in git), status in B2 `trading-rns/paper/retail_offers.md`; setup `deploy/setup-retail.sh`; applications are made by hand (no broker API) |
 | **Scheduled check-in** | a Claude scheduled task that checks the droplet and LLM runs every ~5 hours | re-arms itself; stop it when nothing is running |
 
@@ -349,6 +355,7 @@ uv run python -W ignore -m matched.ledger add ...|summary                # priva
 uv run python -W ignore -m matched.terms terms.txt                      # screen an offer's terms (decision model): GOOD / CAUTION / AVOID
 uv run python -W ignore -m backtest.betfair_racing choose                # Aus & NZ racing at BSP (data in data/betfair/, free from Betfair's data hub)
 uv run python -W ignore -m paper.t212 check|status                     # Trading 212 practice account (factor portfolios)
+uv run python -W ignore -m collect.run listings|prices|borrow|options|analysts|status   # daily snapshots (droplet timers)
 uv run python -W ignore -m paper.retail_offers status                    # live trial (droplet runs `daily`)
 uv run python -W ignore -m backtest.uk_retail_offers choose              # final needs --final, once
 uv run python -W ignore -m backtest.crypto_trend data|choose             # final needs --final, once
