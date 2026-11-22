@@ -82,7 +82,7 @@ then paper trading, then small size.
   locally after upload (`--prune-raw`).
 - Investegate text is personal-use only: never publish or commit it (`data/` is gitignored).
 - Secrets live in `.env` or the environment's credential settings, never in chat or commits.
-- Run `uv run pytest` before pushing. Branch: `claude/uk-smallcap-rns-drift-i83n19`.
+- Run `uv run pytest` before pushing. Branch: `main` (the default; cloud sessions work on a `claude/...` branch and merge into it).
 
 ## 3. Testing rules (every strategy)
 1. **Write the design file and commit it before running.** Every later change is listed as a change.
@@ -280,7 +280,7 @@ small caps.
 
 | Piece | What it is | Notes |
 |---|---|---|
-| **GitHub** | `adamlewison/trading-rns`, branch `claude/uk-smallcap-rns-drift-i83n19` | code and this doc; never data or secrets |
+| **GitHub** | `adamlewison/trading-rns`, branch `main` | code and this doc; never data or secrets |
 | **DigitalOcean droplet** `trading-rns` | 178.62.96.171, 1 vCPU / 1GB RAM / 25GB disk + 2GB swap, ~$6/month | the only machine that scrapes and pushes backups; the user connects with **Termius**; agents reach it themselves (below) |
 | **Backblaze B2** bucket `trading-rns-backup-c0772b` (private) | backups of everything: UK `trading-rns/v1/`, US `trading-rns/us/v1/`, LLM runs and results `trading-rns/llm/v1/` | keys `B2_KEY_ID` / `B2_APP_KEY` in `.env`; also how cloud sessions get the data (`core.backup pull`) |
 | **Cloud sessions** (Claude Code on the web) | where agents work; fresh container each time, 4 CPU / 16GB | data must be pulled from B2 first; API keys for api.openai.com and ai-gateway.vercel.sh are injected by the session's network proxy (no key in code) |
