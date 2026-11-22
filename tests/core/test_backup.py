@@ -84,10 +84,9 @@ def test_markets_are_separate(env):
     assert _tar_names(store, "trading-rns/us/v1/raw/") == ["x/us.gz"]
 
 
-def test_prune_raw_only_for_us_and_restorable(env):
+def test_prune_raw_restorable(env):
     tmp, backup, store = env
-    with pytest.raises(SystemExit):
-        backup.push(store, profile="uk", prune_raw=True)   # the UK cache is never pruned
+    assert backup.get_profile("uk").can_prune_raw            # allowed for UK too (since 2026-11-23)
 
     from ingest.us.common import session
     with session() as con:

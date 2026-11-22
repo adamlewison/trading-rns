@@ -7,8 +7,8 @@
     uv run python -W ignore -m collect.run analysts    # Yahoo analyst forecasts, revisions, earnings dates, S&P 1500
     uv run python -W ignore -m collect.run status      # what has been collected
 
-Files: data/collect/<job>/<YYYY-MM-DD>[THHMM].<ext>, each uploaded to B2 under trading-rns/collect/v1/<job>/.
-Nothing is ever deleted. Polite: one request at a time with pauses; a run stops after repeated refusals."""
+Files: B2 trading-rns/collect/v1/<job>/<YYYY-MM-DD>[THHMM].<ext>. The droplet copy is removed once B2 has it
+(B2 checks the SHA-1); only the newest listings and index holdings stay, as they set the next universes. Polite: one request at a time with pauses; a run stops after repeated refusals."""
 from __future__ import annotations
 
 import argparse
@@ -43,7 +43,19 @@ MAX_FAILS = 25                       # consecutive refusals before a run stops (
 
 # ---------------------------------------------------------------- storage
 
+KEEP_LATEST = {"listings", "index_holdings"}   # the newest file stays on the droplet: it sets the next universes
+
+
+def _tidy(job: str, keep: Path | None) -> None:
+    """Remove local files that are safely in B2 (all of them, or all but the newest for KEEP_LATEST jobs)."""
+    pend = set((ROOT / "upload_pending.txt").read_text().split()) if (ROOT / "upload_pending.txt").exists() else set()
+    for f in (ROOT / job).glob("*"):
+        if f.is_file() and f != keep and f"{job}/{f.name}" not in pend:
+            f.unlink()
+
+
 def save(job: str, name: str, data: bytes) -> Path:
+    """Write locally, upload to B2 (the upload is checked against a SHA-1 by B2), then clear the droplet copy."""
     p = ROOT / job / name
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_bytes(data)
@@ -51,9 +63,11 @@ def save(job: str, name: str, data: bytes) -> Path:
         from core.backup import get_store
         get_store().put(f"{B2_PREFIX}/{job}/{name}", data)
     except Exception as e:                    # kept locally; `upload` retries anything missing
-        log.warning("collect: B2 upload of %s/%s failed: %s", job, name, e)
+        log.warning("collect: B2 upload of %s/%s failed (kept locally): %s", job, name, e)
         (ROOT / "upload_pending.txt").open("a").write(f"{job}/{name}\n")
-    log.info("collect: saved %s/%s (%d KB)", job, name, len(data) // 1024)
+        return p
+    _tidy(job, p if job in KEEP_LATEST else None)
+    log.info("collect: saved %s/%s to B2 (%d KB)", job, name, len(data) // 1024)
     return p
 
 
@@ -243,7 +257,8 @@ def options() -> None:
 def analysts() -> None:
     import yfinance as yf
     syms = _universe_index(("sp500", "sp400", "sp600"))
-    first = latest("analysts", "*.jsonl.gz") is None          # the first file keeps the full rating history
+    from core.backup import get_store                    # the first file keeps the full rating history
+    first = not any("-full" in n for n in get_store().list(f"{B2_PREFIX}/analysts/"))
     out, fails, ok = io.BytesIO(), 0, 0
     with gzip.GzipFile(fileobj=out, mode="wb") as gz:
         for s in syms:
@@ -273,25 +288,29 @@ def upload() -> None:
     from core.backup import get_store
     left = []
     for rel in sorted(set(p.read_text().split())):
+        f = ROOT / rel
+        if not f.exists():
+            continue
         try:
-            get_store().put(f"{B2_PREFIX}/{rel}", (ROOT / rel).read_bytes())
+            get_store().put(f"{B2_PREFIX}/{rel}", f.read_bytes())
+            job = rel.split("/")[0]
+            if not (job in KEEP_LATEST and f == latest(job, "*")):
+                f.unlink()
         except Exception:
             left.append(rel)
     p.write_text("".join(f"{r}\n" for r in left))
 
 
 def status() -> str:
-    lines = ["# Data collection", "", "| Job | Files | First | Latest | Size |", "|---|---|---|---|---|"]
+    """What is in B2 (the droplet keeps nothing but the newest listings)."""
+    from core.backup import get_store
+    lines = ["# Data collection (files in B2)", "", "| Job | Files | First | Latest |", "|---|---|---|---|"]
     for job in ("listings", "index_holdings", "prices", "borrow", "options", "analysts"):
-        fs = sorted(p for p in (ROOT / job).glob("*") if p.is_file())
-        if fs:
-            mb = sum(p.stat().st_size for p in fs) / 1e6
-            lines.append(f"| {job} | {len(fs)} | {fs[0].name.split('.')[0]} | {fs[-1].name.split('.')[0]} | {mb:.0f} MB |")
-        else:
-            lines.append(f"| {job} | 0 | | | |")
+        names = sorted(n.rsplit("/", 1)[-1] for n in get_store().list(f"{B2_PREFIX}/{job}/"))
+        lines.append(f"| {job} | {len(names)} | {names[0].split('.')[0] if names else ''} | {names[-1].split('.')[0] if names else ''} |")
     pend = ROOT / "upload_pending.txt"
     n = len(pend.read_text().split()) if pend.exists() else 0
-    lines += ["", f"Uploads pending: {n}. Updated {datetime.now(timezone.utc):%Y-%m-%d %H:%M} UTC."]
+    lines += ["", f"Waiting on the droplet for upload: {n}. Updated {datetime.now(timezone.utc):%Y-%m-%d %H:%M} UTC."]
     return "\n".join(lines) + "\n"
 
 

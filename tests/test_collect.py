@@ -35,3 +35,29 @@ def test_trim_ud_keeps_recent_only():
     now = time.time()
     r = trim_ud({"upgradeDowngradeHistory": {"history": [{"epochGradeDate": now - 86400}, {"epochGradeDate": now - 90 * 86400}]}}, 45)
     assert len(r["upgradeDowngradeHistory"]["history"]) == 1
+
+
+def test_save_clears_droplet_copy_after_upload(tmp_path, monkeypatch):
+    import collect.run as c
+    import core.backup as cb
+    put = {}
+    monkeypatch.setattr(c, "ROOT", tmp_path)
+    monkeypatch.setattr(cb, "get_store", lambda: type("S", (), {"put": lambda self, n, d: put.__setitem__(n, d)})())
+    c.save("options", "2026-11-23.parquet", b"x")
+    assert put and not (tmp_path / "options" / "2026-11-23.parquet").exists()
+    c.save("listings", "2026-11-22.parquet", b"a")
+    c.save("listings", "2026-11-23.parquet", b"b")
+    assert [p.name for p in (tmp_path / "listings").iterdir()] == ["2026-11-23.parquet"]   # newest kept
+
+
+def test_failed_upload_keeps_file(tmp_path, monkeypatch):
+    import collect.run as c
+    import core.backup as cb
+    monkeypatch.setattr(c, "ROOT", tmp_path)
+
+    def boom(self, n, d):
+        raise RuntimeError("503")
+    monkeypatch.setattr(cb, "get_store", lambda: type("S", (), {"put": boom})())
+    c.save("borrow", "2026-11-23T0805.parquet", b"x")
+    assert (tmp_path / "borrow" / "2026-11-23T0805.parquet").exists()
+    assert "borrow/2026-11-23T0805.parquet" in (tmp_path / "upload_pending.txt").read_text()

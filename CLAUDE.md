@@ -86,8 +86,8 @@ then paper trading, then small size.
   (`llm.confirm_cost_above_gbp`); no DigitalOcean upgrades.
 - **Scraping:** honest User-Agent, respect robots.txt; Investegate 2 req/s, SEC max 8 req/s. On
   403/429 back off, then stop. **Never evade a block**; report it.
-- **Never delete scraped data.** Everything goes to Backblaze B2. Only US cached pages may be pruned
-  locally after upload (`--prune-raw`).
+- **Never delete data from B2.** The droplet keeps nothing B2 already holds (user, 2026-11-23): page caches
+  (UK and US, `--prune-raw`) and collected files are removed locally once uploaded; only live databases stay.
 - Investegate text is personal-use only: never publish or commit it (`data/` is gitignored).
 - Secrets live in `.env` or the environment's credential settings, never in chat or commits.
 - Run `uv run pytest` before pushing. Branch: `main` (the default; cloud sessions work on a `claude/...` branch and merge into it).
@@ -364,7 +364,8 @@ uv run python -W ignore -m ingest.pm.kalshi series|markets|candles|status|upload
 uv run python -W ignore -m backtest.pm_favourites check|choose            # final needs --final, once
 ```
 Backups never lose data: local files are deleted only after a verified upload, and a push never
-replaces a table snapshot with an empty one. Only the US loop prunes cached SEC pages.
+replaces a table snapshot with an empty one. Both loops prune cached pages after upload; a full UK
+re-scrape (`ingest/uk/run_all.sh`) would re-download pages, so first `core.backup pull --profile uk`.
 
 ## 10. Open items
 - **Tax-loss paper baskets:** the design asks for the four baskets to be recorded about 23 December 2026

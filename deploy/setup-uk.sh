@@ -55,7 +55,7 @@ Wants=network-online.target
 [Service]
 WorkingDirectory=$DIR
 Environment=PATH=/root/.local/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=/bin/bash -c 'exec deploy/backup-loop.sh uk >> data/logs/uk_backup.out 2>&1'
+ExecStart=/bin/bash -c 'exec deploy/backup-loop.sh uk --prune-raw >> data/logs/uk_backup.out 2>&1'
 Restart=always
 RestartSec=60
 [Install]

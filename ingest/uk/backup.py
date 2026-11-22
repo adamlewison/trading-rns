@@ -23,7 +23,7 @@ def profile():
                          "lse_service_map", "uk_trading_service", "uk_market_makers"],
         incr_table="ann_bodies", incr_key="ann_id",
         manifest=c["db"].parent / "backup_manifest_uk.json", status_name="status.json",
-        status_fn=status, can_prune_raw=False)          # the UK page cache is never pruned
+        status_fn=status, can_prune_raw=True)           # pages leave the droplet once safely in B2
 
 
 def status() -> dict:
