@@ -14,6 +14,7 @@ Picks and marks go to us.duckdb (`paper_picks`, `paper_marks`, backed up) and a 
 from __future__ import annotations
 
 import argparse
+import os
 from datetime import date, datetime
 
 import numpy as np
@@ -139,6 +140,12 @@ def daily(force: bool = False) -> None:
     m = mark()
     get_store().put(STATUS_KEY, status_text(m).encode())
     log.info("paper: status updated")
+    if os.environ.get("T212_API_KEY"):               # the same portfolios as practice-account orders (paper/t212.py)
+        try:
+            from paper import t212
+            t212.daily(today.date())
+        except Exception as e:                         # never let the practice account break the paper record
+            log.error("paper: Trading 212 step failed: %s", e)
 
 
 def main() -> None:

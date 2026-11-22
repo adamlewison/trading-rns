@@ -56,6 +56,9 @@ then paper trading, then small size.
   (V, Q, M, QVM; frozen rules in `backtest/DESIGN_FACTORS.md`), droplet timer `trading-rns-paper` weekdays
   22:30 UTC, first rebalance **2026-12-01**. Results: `uv run python -W ignore -m paper.factors status`, or
   B2 `trading-rns/paper/status.md`. Judge after ≥ 12 months; no picking a winner early.
+  **Also on a Trading 212 practice account** (built 2026-11-22, `paper/t212.py`): one account, four virtual books,
+  net orders after the close fill at the next open; status B2 `trading-rns/paper/t212.md`. Needs the practice key
+  (`T212_API_KEY`/`T212_API_SECRET`) in the droplet's `/opt/trading-rns-us/.env`; runs only when it's there.
 - **The user's account:** about $6,000, around $150 per trade, Trading 212 (IBKR opened 2026-11-15), holds up to ~20 days.
 - **The user's preference (2026-11-15):** short trades (hours to days) whose gains are reinvested (lesson 17).
 - **The user's preference (2026-11-18):** not interested in one-off gains of a few hundred pounds (bookmaker sign-up offers);
@@ -290,6 +293,7 @@ small caps.
 | **Droplet control** | `deploy/on-droplet.sh "CMD" [DIR]` picks the route: SSH if this machine can, else the B2 job queue | see *Reaching the droplet* below |
 | **Keys** | `.env.example` lists every key and where it lives | cloud sessions: environment network secrets (B2, OpenAI, Vercel) injected by the proxy; droplet: `.env` files |
 | **Paper trading** | `paper/factors.py`, droplet timer `trading-rns-paper` (weekdays 22:30 UTC; acts on the first trading day of each month) | tables `paper_picks`, `paper_marks` (backed up); summary in B2 `trading-rns/paper/status.md`; setup `deploy/setup-paper.sh` |
+| **T212 practice orders** | `paper/t212.py`, called by `paper.factors daily` when `T212_API_KEY` is set | practice host only; `check` tests the key and ticker coverage; tables `t212_*` (backed up) |
 | **Retail-offers trial** | `paper/retail_offers.py`, droplet timer `trading-rns-retail` (weekdays, from `/opt/trading-rns-pm`) | scans new announcements (07:30, 17:30, 18:45 UK), reads retail offers with Luna, sends a phone alert through ntfy for each new offer open to new investors (topic name in the droplet's `/opt/trading-rns-pm/.env` as `NTFY_TOPIC`, never in git), status in B2 `trading-rns/paper/retail_offers.md`; setup `deploy/setup-retail.sh`; applications are made by hand (no broker API) |
 | **Scheduled check-in** | a Claude scheduled task that checks the droplet and LLM runs every ~5 hours | re-arms itself; stop it when nothing is running |
 
@@ -344,6 +348,7 @@ uv run python -W ignore -m matched.scan [--book williamhill] [--stake 10 --free 
 uv run python -W ignore -m matched.ledger add ...|summary                # private record of offers done
 uv run python -W ignore -m matched.terms terms.txt                      # screen an offer's terms (decision model): GOOD / CAUTION / AVOID
 uv run python -W ignore -m backtest.betfair_racing choose                # Aus & NZ racing at BSP (data in data/betfair/, free from Betfair's data hub)
+uv run python -W ignore -m paper.t212 check|status                     # Trading 212 practice account (factor portfolios)
 uv run python -W ignore -m paper.retail_offers status                    # live trial (droplet runs `daily`)
 uv run python -W ignore -m backtest.uk_retail_offers choose              # final needs --final, once
 uv run python -W ignore -m backtest.crypto_trend data|choose             # final needs --final, once

@@ -68,3 +68,20 @@ return) over the period. The other three variants print for information only.
 Quality +41.7% (7.2%/yr) vs SPY +64.0% (10.4%/yr); beat SPY in 2 of 5 years. For information only (they
 failed the choose period, so choosing them now would be hindsight): Value +78.3%, QVM +78.4%, Momentum
 +73.6%. Across both periods every variant won in one and lost in the other: no consistent edge.
+
+## Addition 2026-11-22: the paper portfolios also placed on a Trading 212 practice account (user's request)
+Nothing in the scoring or picks changes; this only adds a second record made of real (practice) orders.
+- **One account, four books.** Each portfolio keeps its own virtual book ($6,000 start, shares, cash).
+  On each rebalance day each portfolio's target is its value / 30 per pick at that day's close; its change
+  per ticker is target − held; the four changes are added per ticker and only the net is sent as a market
+  order (sells first, quantity rounded to 4 decimals), after the US close, so it fills at the **next open**.
+- **Booking.** When the fills come back, every portfolio's change on a ticker is booked at that ticker's
+  average fill price, scaled by the share of the net order that filled; a ticker whose changes cancel out
+  is booked at the reference close. So the four books always add up to the account (checked daily).
+  Each portfolio is charged FX 0.15% on its own full trades (fills already include spread and slippage).
+- **Not on Trading 212:** that slot stays in cash for the month (logged). A rebalance is skipped if the
+  previous month's orders aren't all settled.
+- **Known differences from the paper record:** next-open fills instead of the close; net orders (the
+  account trades less than four separate accounts would); practice fills may be kinder than real ones.
+- Code `paper/t212.py` (practice host only); tables `t212_intents`, `t212_orders`, `t212_book`,
+  `t212_marks` (backed up); status in B2 `trading-rns/paper/t212.md`. Judged with the paper record (≥ 12 months).

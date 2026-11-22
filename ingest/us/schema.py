@@ -66,6 +66,19 @@ CREATE TABLE IF NOT EXISTS paper_picks (           -- paper trading: what the fr
 CREATE TABLE IF NOT EXISTS paper_marks (           -- paper trading: each month's result vs SPY
     variant VARCHAR, entry DATE, until DATE, ret DOUBLE, spy DOUBLE, open BOOLEAN, updated_at TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS t212_intents (      -- each portfolio's intended share change per rebalance
+    rebalance DATE, variant VARCHAR, ticker VARCHAR, delta DOUBLE, ref_price DOUBLE
+);
+CREATE TABLE IF NOT EXISTS t212_orders (       -- the net orders sent to the practice account
+    rebalance DATE, ticker VARCHAR, t212 VARCHAR, qty DOUBLE, order_id BIGINT, status VARCHAR,
+    filled_qty DOUBLE, fill_price DOUBLE, fees_acct DOUBLE, placed_at TIMESTAMP, settled_at TIMESTAMP, note VARCHAR
+);
+CREATE TABLE IF NOT EXISTS t212_book (         -- each portfolio's booked trades (shares at the fill price)
+    variant VARCHAR, rebalance DATE, ticker VARCHAR, shares DOUBLE, price DOUBLE, cost_usd DOUBLE, source VARCHAR
+);
+CREATE TABLE IF NOT EXISTS t212_marks (        -- each portfolio's value per day, and the account check
+    date DATE, variant VARCHAR, value_usd DOUBLE, cash_usd DOUBLE, recon_gap DOUBLE, updated_at TIMESTAMP
+);
 CREATE TABLE IF NOT EXISTS us_progress (
     key VARCHAR PRIMARY KEY, status VARCHAR, n INTEGER, updated_at TIMESTAMP
 );
