@@ -56,7 +56,7 @@ then paper trading, then small size.
   (V, Q, M, QVM; frozen rules in `backtest/DESIGN_FACTORS.md`), droplet timer `trading-rns-paper` weekdays
   22:30 UTC, first rebalance **2026-12-01**. Results: `uv run python -W ignore -m paper.factors status`, or
   B2 `trading-rns/paper/status.md`. Judge after ≥ 12 months; no picking a winner early.
-  **Also on a Trading 212 practice account** (built 2026-11-22, `paper/t212.py`): one account, four virtual books,
+  **Also on a Trading 212 practice account** (built 2026-11-22, `paper/t212.py`): one account, four virtual books of $1,500 (practice cash is £5,000),
   net orders after the close fill at the next open; status B2 `trading-rns/paper/t212.md`. Needs the practice key
   (`T212_API_KEY`/`T212_API_SECRET`) in the droplet's `/opt/trading-rns-us/.env`; runs only when it's there.
 - **The user's account:** about $6,000, around $150 per trade, Trading 212 (IBKR opened 2026-11-15), holds up to ~20 days.

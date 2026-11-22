@@ -4,8 +4,8 @@
     uv run python -W ignore -m paper.t212 daily      # paper.factors daily calls this after its own work
     uv run python -W ignore -m paper.t212 status     # print the practice-account record
 
-One account holds all four portfolios (V, Q, M, QVM). Each portfolio has its own virtual book: $6,000 to
-start, shares per ticker, cash. On each rebalance day (the day paper.factors records new picks):
+One account holds all four portfolios (V, Q, M, QVM). Each portfolio has its own virtual book: $1,500 to
+start (T212_START_USD; four must fit the practice cash), shares per ticker, cash. On each rebalance day (the day paper.factors records new picks):
   1. every portfolio's target is its value / 30 per pick, in shares at today's close;
   2. each portfolio's change per ticker is target minus held; the four are added up per ticker;
   3. only the net per ticker is sent as a market order (sells first), queued for the next US open;
@@ -31,7 +31,7 @@ from core.log import get_logger
 
 log = get_logger("t212")
 BASE = "https://demo.trading212.com/api/v0"          # practice account only, by design
-START_USD = 6000.0
+START_USD = float(os.environ.get("T212_START_USD", 1500))   # per portfolio; four must fit the practice cash
 N_HOLD = 30
 FX_SIDE = 0.0015                                     # Trading 212 FX fee each way (design costs)
 MIN_TRADE_USD = 1.0                                  # skip dust changes per portfolio and ticker
@@ -45,16 +45,14 @@ STATUS_KEY = "trading-rns/paper/t212.md"
 
 def ticker_map(instruments: list[dict]) -> dict[str, str]:
     """Our (Yahoo) US ticker -> Trading 212 ticker, from the instrument list (US stocks only)."""
+    us = [i for i in instruments if i.get("type") == "STOCK" and i.get("currencyCode") == "USD"
+          and (i.get("ticker") or "").endswith(("_US_EQ", "_EQ_US"))]
     out: dict[str, str] = {}
-    for i in instruments:
-        t = i.get("ticker") or ""
-        if i.get("type") != "STOCK" or i.get("currencyCode") != "USD" or not t.endswith("_US_EQ"):
-            continue
-        keys = {t[: -len("_US_EQ")].replace("_", "-").upper()}
+    for i in us:                                  # the displayed symbol wins (META is FB_US_EQ inside T212)
         if i.get("shortName"):
-            keys.add(i["shortName"].upper().replace(".", "-").replace("/", "-"))
-        for k in keys:
-            out.setdefault(k, t)
+            out.setdefault(i["shortName"].upper().replace(".", "-").replace("/", "-"), i["ticker"])
+    for i in us:
+        out.setdefault(i["ticker"][:-6].replace("_", "-").upper(), i["ticker"])
     return out
 
 

@@ -71,8 +71,9 @@ failed the choose period, so choosing them now would be hindsight): Value +78.3%
 
 ## Addition 2026-11-22: the paper portfolios also placed on a Trading 212 practice account (user's request)
 Nothing in the scoring or picks changes; this only adds a second record made of real (practice) orders.
-- **One account, four books.** Each portfolio keeps its own virtual book ($6,000 start, shares, cash).
-  On each rebalance day each portfolio's target is its value / 30 per pick at that day's close; its change
+- **One account, four books.** Each portfolio keeps its own virtual book (shares, cash), starting at **$1,500** (the practice
+  account holds £5,000, so four × $6,000 doesn't fit; percentage returns don't depend on size).
+  On each rebalance day each portfolio's target is its value / 30 per pick (≈ $50) at that day's close; its change
   per ticker is target − held; the four changes are added per ticker and only the net is sent as a market
   order (sells first, quantity rounded to 4 decimals), after the US close, so it fills at the **next open**.
 - **Booking.** When the fills come back, every portfolio's change on a ticker is booked at that ticker's

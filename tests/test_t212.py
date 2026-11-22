@@ -8,10 +8,12 @@ def test_ticker_map_us_stocks_only():
     m = ticker_map([
         {"ticker": "AAPL_US_EQ", "type": "STOCK", "currencyCode": "USD", "shortName": "AAPL"},
         {"ticker": "BRK_B_US_EQ", "type": "STOCK", "currencyCode": "USD", "shortName": "BRK.B"},
+        {"ticker": "TPR_EQ_US", "type": "STOCK", "currencyCode": "USD", "shortName": "TPR"},
+        {"ticker": "FB_US_EQ", "type": "STOCK", "currencyCode": "USD", "shortName": "META"},
         {"ticker": "VODl_EQ", "type": "STOCK", "currencyCode": "GBX", "shortName": "VOD"},
         {"ticker": "SPY_US_EQ", "type": "ETF", "currencyCode": "USD", "shortName": "SPY"},
     ])
-    assert m == {"AAPL": "AAPL_US_EQ", "BRK-B": "BRK_B_US_EQ"}
+    assert m == {"AAPL": "AAPL_US_EQ", "BRK-B": "BRK_B_US_EQ", "TPR": "TPR_EQ_US", "META": "FB_US_EQ", "FB": "FB_US_EQ"}
 
 
 def test_plan_first_month_equal_weight():
