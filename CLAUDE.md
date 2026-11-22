@@ -87,7 +87,9 @@ then paper trading, then small size.
 - **Scraping:** honest User-Agent, respect robots.txt; Investegate 2 req/s, SEC max 8 req/s. On
   403/429 back off, then stop. **Never evade a block**; report it.
 - **Never delete data from B2.** The droplet keeps nothing B2 already holds (user, 2026-11-23): page caches
-  (UK and US, `--prune-raw`) and collected files are removed locally once uploaded; only live databases stay.
+  (UK and US, `--prune-raw`) and collected files are removed locally once uploaded; finished tables are trimmed
+  from the droplet DBs with `core.slim` (US 8-K texts, `us_insider_tx` (now archived: pulled, not pushed), UK
+  bodies before 2026-11-01, the derived `announcements` tables). Cloud sessions get everything back with `core.backup pull`.
 - Investegate text is personal-use only: never publish or commit it (`data/` is gitignored).
 - Secrets live in `.env` or the environment's credential settings, never in chat or commits.
 - Run `uv run pytest` before pushing. Branch: `main` (the default; cloud sessions work on a `claude/...` branch and merge into it).
@@ -355,6 +357,7 @@ uv run python -W ignore -m matched.ledger add ...|summary                # priva
 uv run python -W ignore -m matched.terms terms.txt                      # screen an offer's terms (decision model): GOOD / CAUTION / AVOID
 uv run python -W ignore -m backtest.betfair_racing choose                # Aus & NZ racing at BSP (data in data/betfair/, free from Betfair's data hub)
 uv run python -W ignore -m paper.t212 check|status                     # Trading 212 practice account (factor portfolios)
+uv run python -W ignore -m core.slim plan|run --profile us|uk          # drop from the droplet DB what B2 holds, rebuild the file (stop that backup loop first)
 uv run python -W ignore -m collect.run listings|prices|borrow|options|analysts|status   # daily snapshots (droplet timers)
 uv run python -W ignore -m paper.retail_offers status                    # live trial (droplet runs `daily`)
 uv run python -W ignore -m backtest.uk_retail_offers choose              # final needs --final, once

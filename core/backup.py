@@ -67,6 +67,7 @@ class Profile:
     status_fn: Callable[[], dict] | None = None
     can_prune_raw: bool = False         # may local raw files be deleted once safely in the store?
     bulk_dir: Path | None = None        # large single files backed up in chunks (push-bulk)
+    archived_tables: tuple[str, ...] = ()  # finished tables: kept in the store, restored by pull, no longer pushed
 
 
 def get_profile(name: str = "uk") -> Profile:
@@ -380,7 +381,7 @@ def pull(store: Store | None = None, force: bool = False, profile: str = "uk", s
     names = store.list(f"{prefix}/")
     parts = []
     with tempfile.TemporaryDirectory() as d, session(db=pf.db, schema=pf.schema) as con:
-        for t in pf.snapshot_tables:
+        for t in [*pf.snapshot_tables, *pf.archived_tables]:
             data = store.get(f"{prefix}/db/{t}.parquet")
             if data is None:
                 continue

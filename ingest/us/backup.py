@@ -20,11 +20,12 @@ def profile():
         name="us", prefix=c["backup_prefix"], db=c["db"], schema=SCHEMA, raw_dir=c["raw_dir"] / "sec",
         snapshot_tables=["sec_form_index", "sec_companies", "sec_filings", "sec_ticker_map", "us_facts",
                          "us_prices_daily", "us_price_download_log", "us_progress",
-                         "us_splits", "us_split_log", "us_insider_tx", "us_etf_daily", "paper_picks", "paper_marks",
+                         "us_splits", "us_split_log", "us_etf_daily", "paper_picks", "paper_marks",
                          "t212_intents", "t212_orders", "t212_book", "t212_marks"],
         incr_table="us_filing_docs", incr_key="accession",
         manifest=c["db"].parent / "backup_manifest_us.json", status_name="us_status.json",
-        status_fn=status, can_prune_raw=True, bulk_dir=c["raw_dir"] / "bulk")
+        status_fn=status, can_prune_raw=True, bulk_dir=c["raw_dir"] / "bulk",
+        archived_tables=("us_insider_tx",))          # insider test finished: kept in B2 only (core.slim)
 
 
 def status() -> dict:
