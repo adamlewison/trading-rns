@@ -235,3 +235,4 @@ settle this: only a record of real allocations can.
 - Applications go through a participating broker (announcements: "contact your broker"; Hargreaves
   Lansdown is named publicly for WRAP). Which brokers carry RetailBook and BookBuild offers is not
   published in one place: the user must confirm with their broker. IBKR and Trading 212 do not take part.
+- **AJ Bell takes part in WRAP offers** (confirmed by its Dealing Services, 2026-11-26, for XAR and HREE): no charge, £100 minimum, order via the buy/sell page with the offer's SEDOL, cash must be in the account and is ring-fenced until close, unfilled cash returns after scale-back, cancellable until close (best endeavours near the deadline), sellable once the shares arrive. Selling fee and account types (ISA/SIPP) not stated.
